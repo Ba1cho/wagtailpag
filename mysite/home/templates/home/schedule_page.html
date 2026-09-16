@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block body_class %}template-schedulepage{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root { --accent:#2563eb; --accent-soft:#dbeafe; --bg:#f3f4f6; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb; --radius:14px; }
+  .sch { font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color: var(--text); }
+  .sch h1 { font-size:2rem; margin:0 0 .25rem; }
+  .sch-sub { color:var(--muted); margin:0 0 1.5rem; }
+  .sch-filters { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; margin-bottom:1.5rem; display:flex; flex-direction:column; gap:1rem; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .sch-filter-row { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+  .sch-filter-label { font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); min-width:110px; }
+  .chip { border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:999px; padding:.4rem 1rem; font-size:.9rem; cursor:pointer; transition:all .15s ease; user-select:none; }
+  .chip:hover { border-color:var(--accent); color:var(--accent); }
+  .chip.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; box-shadow:0 2px 6px rgba(37,99,235,.35); }
+  .chip-input { border:1px solid var(--border); border-radius:8px; padding:.4rem .6rem; font-size:.9rem; color:var(--text); background:var(--bg); }
+  .sch-reset { margin-left:auto; font-size:.85rem; color:var(--muted); background:none; border:none; cursor:pointer; text-decoration:underline; }
+  .sch-reset:hover { color:var(--accent); }
+  .sch-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1.25rem; }
+  .sch-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:1.25rem; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .sch-card.hidden { display:none; }
+  .sch-card.selected { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); }
+  .sch-card-title { font-size:1.2rem; font-weight:700; margin:0; }
+  .sch-curator { color:var(--muted); font-size:.9rem; margin:.15rem 0 .75rem; }
+  .sch-curator b { color:var(--accent); }
+  .sch-students { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:1rem; }
+  .sch-student { background:var(--bg); border:1px solid var(--border); border-radius:999px; font-size:.8rem; padding:.2rem .7rem; color:var(--muted); }
+  .sch-table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  .sch-table th { text-align:left; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:.5rem .6rem; border-bottom:2px solid var(--border); }
+  .sch-table td { padding:.6rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  .sch-table tr.hidden { display:none; }
+  .sch-table tr:last-child td { border-bottom:none; }
+  .sch-day { font-weight:600; white-space:nowrap; }
+  .sch-time-badge { display:inline-block; background:var(--accent-soft); color:var(--accent); border-radius:6px; padding:.15rem .5rem; font-weight:600; white-space:nowrap; }
+  .sch-date-badge { display:inline-block; background:#fef3c7; color:#92400e; border-radius:6px; padding:.1rem .45rem; font-size:.78rem; margin-left:.3rem; }
+  .sch-subject { font-weight:600; }
+  .sch-empty { color:var(--muted); font-style:italic; }
+  .sch-badge-count { background:var(--accent-soft); color:var(--accent); border-radius:999px; font-size:.75rem; padding:.1rem .55rem; font-weight:600; margin-left:.4rem; }
+  .sch-nothing { text-align:center; color:var(--muted); padding:3rem 0; }
+  .sch-nothing.hidden { display:none; }
+  @media (max-width:640px){ .sch-filter-label { min-width:100%; } }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="sch">
+  <h1>{{ page.title }}</h1>
+  <p class="sch-sub">Расписание занятий по группам. Используйте фильтры ниже.</p>
+
+  {% include "home/schedule_filters.html" %}
+  {% include "home/schedule_cards.html" %}
+
+  <p class="sch-nothing hidden" id="sch-nothing">По выбранным фильтрам занятий не найдено.</p>
+</div>
+
+{% include "home/schedule_script.html" %}
+{% endblock content %}

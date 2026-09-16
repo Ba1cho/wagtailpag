@@ -1,0 +1,34 @@
+<div class="sch-filters" id="sch-filters">
+  <div class="sch-filter-row" id="sch-group-row">
+    <span class="sch-filter-label">Группы</span>
+    <button class="chip active" data-group="all">Все группы</button>
+    {% for group in schedule_groups %}
+      <button class="chip" data-group="{{ group.slug }}">{{ group.name }}</button>
+    {% endfor %}
+  </div>
+  <div class="sch-filter-row" id="sch-weekday-row">
+    <span class="sch-filter-label">День недели</span>
+    <button class="chip active" data-weekday="all">Любой</button>
+    {% for value, label in weekday_choices %}
+      <button class="chip" data-weekday="{{ value }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+  <div class="sch-filter-row">
+    <span class="sch-filter-label">Дата</span>
+    <input type="date" class="chip-input" id="sch-date">
+  </div>
+  <div class="sch-filter-row">
+    <span class="sch-filter-label">Часы</span>
+    <span>с</span>
+    <select class="chip-input" id="sch-hour-from">
+      <option value="">—</option>
+      {% for h in hours %}<option value="{{ h }}">{{ h }}:00</option>{% endfor %}
+    </select>
+    <span>до</span>
+    <select class="chip-input" id="sch-hour-to">
+      <option value="">—</option>
+      {% for h in hours %}<option value="{{ h }}">{{ h }}:00</option>{% endfor %}
+    </select>
+    <button type="button" class="sch-reset" id="sch-reset">Сбросить фильтры</button>
+  </div>
+</div>

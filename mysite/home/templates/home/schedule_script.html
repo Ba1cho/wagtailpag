@@ -1,0 +1,83 @@
+<script>
+(function () {
+  var groupRow = document.getElementById('sch-group-row');
+  var weekdayRow = document.getElementById('sch-weekday-row');
+  var dateInput = document.getElementById('sch-date');
+  var hourFrom = document.getElementById('sch-hour-from');
+  var hourTo = document.getElementById('sch-hour-to');
+  var resetBtn = document.getElementById('sch-reset');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.sch-card'));
+  var nothing = document.getElementById('sch-nothing');
+
+  var state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '' };
+
+  function setChipActive(container, chip) {
+    container.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
+    chip.classList.add('active');
+  }
+
+  function rowMatches(tr) {
+    if (state.weekday !== 'all' && tr.dataset.weekday !== state.weekday) return false;
+    if (state.date) {
+      // если у занятия указана конкретная дата — она должна совпасть;
+      // занятия без даты показываем, если совпал день недели
+      if (tr.dataset.date && tr.dataset.date !== state.date) return false;
+    }
+    var start = parseInt(tr.dataset.startHour, 10);
+    if (!isNaN(start)) {
+      if (state.hourFrom !== '' && start < parseInt(state.hourFrom, 10)) return false;
+      if (state.hourTo !== '' && start >= parseInt(state.hourTo, 10) + 1) return false;
+    }
+    return true;
+  }
+
+  function apply() {
+    var visibleCards = 0;
+    cards.forEach(function (card) {
+      var groupOk = (state.group === 'all' || card.dataset.group === state.group);
+      var anyVisible = false;
+      if (groupOk) {
+        var rows = Array.prototype.slice.call(card.querySelectorAll('tbody tr'));
+        rows.forEach(function (tr) {
+          var ok = rowMatches(tr);
+          tr.classList.toggle('hidden', !ok);
+          if (ok) anyVisible = true;
+        });
+        if (rows.length === 0) anyVisible = true;
+      }
+      card.classList.toggle('hidden', !(groupOk && anyVisible));
+      card.classList.toggle('selected', groupOk && state.group !== 'all');
+      if (groupOk && anyVisible) visibleCards++;
+    });
+    nothing.classList.toggle('hidden', visibleCards !== 0);
+  }
+
+  groupRow.addEventListener('click', function (e) {
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    setChipActive(groupRow, chip);
+    state.group = chip.dataset.group;
+    apply();
+  });
+
+  weekdayRow.addEventListener('click', function (e) {
+    var chip = e.target.closest('.chip');
+    if (!chip) return;
+    setChipActive(weekdayRow, chip);
+    state.weekday = chip.dataset.weekday;
+    apply();
+  });
+
+  dateInput.addEventListener('change', function () { state.date = dateInput.value; apply(); });
+  hourFrom.addEventListener('change', function () { state.hourFrom = hourFrom.value; apply(); });
+  hourTo.addEventListener('change', function () { state.hourTo = hourTo.value; apply(); });
+
+  resetBtn.addEventListener('click', function () {
+    state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '' };
+    dateInput.value = ''; hourFrom.value = ''; hourTo.value = '';
+    setChipActive(groupRow, groupRow.querySelector('[data-group="all"]'));
+    setChipActive(weekdayRow, weekdayRow.querySelector('[data-weekday="all"]'));
+    apply();
+  });
+})();
+</script>

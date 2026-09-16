@@ -1,0 +1,14 @@
+{# odt_document_page.html #}
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>{{ page.title }}</h1>
+    
+    {% if document_html %}
+        <div class="odt-content">
+            {{ document_html|safe }}
+        </div>
+    {% else %}
+        <p>Документ не загружен или не может быть отображен.</p>
+    {% endif %}
+{% endblock %}

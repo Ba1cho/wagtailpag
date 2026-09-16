@@ -1,0 +1,50 @@
+<div class="sch-grid" id="sch-cards">
+  {% for group in schedule_groups %}
+    <section class="sch-card" data-group="{{ group.slug }}">
+      <h2 class="sch-card-title">
+        {{ group.name }}
+        <span class="sch-badge-count">{{ group.lessons.count }} зан.</span>
+      </h2>
+      <p class="sch-curator">Куратор: <b>{{ group.curator.name }}</b></p>
+
+      {% if group.students.all %}
+        <div class="sch-students">
+          {% for student in group.students.all %}
+            <span class="sch-student">{{ student.last_name }} {{ student.first_name|slice:":1" }}.</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if group.lessons.all %}
+        <table class="sch-table">
+          <thead>
+            <tr><th>День</th><th>Время</th><th>Предмет</th></tr>
+          </thead>
+          <tbody>
+            {% for lesson in group.lessons.all %}
+              <tr data-weekday="{{ lesson.weekday }}"
+                  data-date="{% if lesson.date %}{{ lesson.date|date:'Y-m-d' }}{% endif %}"
+                  data-start-hour="{{ lesson.start_time|time:'G' }}">
+                <td class="sch-day">
+                  {{ lesson.get_weekday_display }}{% if lesson.date %}<span class="sch-date-badge">{{ lesson.date|date:'d.m.Y' }}</span>{% endif %}
+                </td>
+                <td>
+                  <span class="sch-time-badge">{{ lesson.start_time|time:'H:i' }}–{{ lesson.end_time|time:'H:i' }}</span>
+                </td>
+                <td>
+                  <span class="sch-subject">{{ lesson.subject }}</span>
+                  {% if lesson.teacher %}<br><small style="color:#6b7280">{{ lesson.teacher.name }}</small>{% endif %}
+                  {% if lesson.room %}<br><small style="color:#9ca3af">ауд. {{ lesson.room }}</small>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="sch-empty">Занятий нет.</p>
+      {% endif %}
+    </section>
+  {% empty %}
+    <p class="sch-nothing">Группы пока не добавлены.</p>
+  {% endfor %}
+</div>
