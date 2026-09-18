@@ -3,7 +3,7 @@
     <span class="sch-filter-label">Группы</span>
     <button class="chip active" data-group="all">Все группы</button>
     {% for group in schedule_groups %}
-      <button class="chip" data-group="{{ group.slug }}">{{ group.name }}</button>
+      <button class="chip" data-group="{{ group.pk }}">{{ group.name }}</button>
     {% endfor %}
   </div>
   <div class="sch-filter-row" id="sch-weekday-row">

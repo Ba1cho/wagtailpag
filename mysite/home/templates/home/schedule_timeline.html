@@ -1,0 +1,31 @@
+<div class="sch-timeline hidden" id="sch-timeline">
+  {% for group in schedule_groups %}
+    <section class="sch-card sch-tl-card" data-group="{{ group.pk }}">
+      <h2 class="sch-card-title">
+        {{ group.name }}
+        <span class="sch-badge-count">{{ group.lessons.count }} зан.</span>
+      </h2>
+      <div class="sch-tl">
+        <div class="sch-tl-hours">
+          {% for h in hours %}<div class="sch-tl-hour"><span>{{ h }}:00</span></div>{% endfor %}
+        </div>
+        <div class="sch-tl-canvas" data-group="{{ group.slug }}">
+          {% for lesson in group.lessons.all %}
+            <div class="sch-tl-block"
+                 data-weekday="{{ lesson.weekday }}"
+                 data-date="{% if lesson.date %}{{ lesson.date|date:'Y-m-d' }}{% endif %}"
+                 data-start="{{ lesson.start_time|time:'H:i' }}"
+                 data-end="{{ lesson.end_time|time:'H:i' }}">
+              <span class="sch-tl-block-time">{{ lesson.start_time|time:'H:i' }}–{{ lesson.end_time|time:'H:i' }}</span>
+              <span class="sch-tl-block-subject">{{ lesson.subject }}</span>
+              {% if lesson.teacher %}<span class="sch-tl-block-meta">{{ lesson.teacher.name }}</span>{% endif %}
+              {% if lesson.room %}<span class="sch-tl-block-meta">ауд. {{ lesson.room }}</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  {% empty %}
+    <p class="sch-nothing">Группы пока не добавлены.</p>
+  {% endfor %}
+</div>

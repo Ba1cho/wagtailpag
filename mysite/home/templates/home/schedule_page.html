@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <style>
-  :root { --accent:#2563eb; --accent-soft:#dbeafe; --bg:#f3f4f6; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb; --radius:14px; }
+  :root { --accent:#2563eb; --accent-soft:#dbeafe; --bg:#f3f4f6; --card:#fff; --text:#111827; --muted:#6b7280; --border:#e5e7eb; --radius:14px; --hour-h:56px; }
   .sch { font-family: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color: var(--text); }
   .sch h1 { font-size:2rem; margin:0 0 .25rem; }
   .sch-sub { color:var(--muted); margin:0 0 1.5rem; }
@@ -41,6 +41,27 @@
   .sch-nothing { text-align:center; color:var(--muted); padding:3rem 0; }
   .sch-nothing.hidden { display:none; }
   @media (max-width:640px){ .sch-filter-label { min-width:100%; } }
+
+  /* ---- View toggle ---- */
+  .sch-view-toggle { display:inline-flex; gap:.35rem; margin-bottom:1.25rem; }
+  /* ---- Timeline ---- */
+  .sch-tl-card.hidden { display:none; }
+  .sch-tl { display:flex; border:1px solid var(--border); border-radius:10px; background:var(--bg); overflow:hidden; }
+  .sch-tl-hours { display:flex; flex-direction:column; border-right:1px solid var(--border); background:var(--card); }
+  .sch-tl-hour { height:var(--hour-h); box-sizing:border-box; border-bottom:1px dashed var(--border); font-size:.72rem; color:var(--muted); padding:.15rem .6rem 0; white-space:nowrap; }
+  .sch-tl-hour:last-child { border-bottom:none; }
+  .sch-tl-canvas { position:relative; flex:1; }
+  .sch-tl-line { position:absolute; left:0; right:0; height:0; border-top:1px dashed var(--border); pointer-events:none; }
+  .sch-tl-block { position:absolute; left:.5rem; right:.5rem; box-sizing:border-box; background:var(--accent-soft); border:1px solid var(--accent); border-left:4px solid var(--accent); border-radius:8px; padding:.3rem .55rem; overflow:hidden; display:flex; flex-direction:column; gap:.1rem; transition:box-shadow .15s ease, opacity .15s ease; cursor:default; }
+  .sch-tl-block:hover { box-shadow:0 2px 8px rgba(37,99,235,.3); z-index:2; }
+  .sch-tl-block.hidden { display:none; }
+  .sch-tl-block-time { font-size:.72rem; font-weight:700; color:var(--accent); white-space:nowrap; }
+  .sch-tl-block-subject { font-size:.85rem; font-weight:600; line-height:1.2; }
+  .sch-tl-block-meta { font-size:.72rem; color:var(--muted); }
+  .sch-tl-block.past { opacity:.45; }
+  .sch-tl-now { position:absolute; left:0; right:0; height:0; border-top:2px solid #dc2626; z-index:3; pointer-events:none; }
+  .sch-tl-now::before { content:"сейчас"; position:absolute; right:2px; top:-1.35rem; font-size:.68rem; color:#dc2626; font-weight:600; background:var(--card); border-radius:6px; padding:0 .35rem; }
+  .sch-tl-empty-note { color:var(--muted); font-size:.8rem; font-style:italic; margin:.4rem 0 0; }
 </style>
 {% endblock extra_css %}
 
@@ -50,7 +71,12 @@
   <p class="sch-sub">Расписание занятий по группам. Используйте фильтры ниже.</p>
 
   {% include "home/schedule_filters.html" %}
+  <div class="sch-view-toggle">
+    <button class="chip active" id="sch-view-table" type="button">Таблица</button>
+    <button class="chip" id="sch-view-timeline" type="button">Таймлайн дня</button>
+  </div>
   {% include "home/schedule_cards.html" %}
+  {% include "home/schedule_timeline.html" %}
 
   <p class="sch-nothing hidden" id="sch-nothing">По выбранным фильтрам занятий не найдено.</p>
 </div>

@@ -1,6 +1,6 @@
 <div class="sch-grid" id="sch-cards">
   {% for group in schedule_groups %}
-    <section class="sch-card" data-group="{{ group.slug }}">
+    <section class="sch-card" data-group="{{ group.pk }}">
       <h2 class="sch-card-title">
         {{ group.name }}
         <span class="sch-badge-count">{{ group.lessons.count }} зан.</span>

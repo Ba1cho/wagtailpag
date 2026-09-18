@@ -7,13 +7,31 @@
   var hourTo = document.getElementById('sch-hour-to');
   var resetBtn = document.getElementById('sch-reset');
   var cards = Array.prototype.slice.call(document.querySelectorAll('.sch-card'));
+  var timeline = document.getElementById('sch-timeline');
+  var tlCards = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-tl-card')) : [];
+  var viewTableBtn = document.getElementById('sch-view-table');
+  var viewTimelineBtn = document.getElementById('sch-view-timeline');
   var nothing = document.getElementById('sch-nothing');
 
-  var state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '' };
+  var MIN_HOUR = 6, MAX_HOUR = 23, HOUR_PX = 56; // должно совпадать с --hour-h и range(6, 23) в модели
+  var state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '', view: 'table' };
 
   function setChipActive(container, chip) {
     container.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
     chip.classList.add('active');
+  }
+
+  function toMinutes(hhmm) {
+    var p = hhmm.split(':');
+    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+  }
+
+  /* Пересечение промежутка [from, to) с промежутком занятия [start, end) */
+  function intervalMatches(startMin, endMin) {
+    if (state.hourFrom === '' && state.hourTo === '') return true;
+    var from = state.hourFrom === '' ? MIN_HOUR * 60 : parseInt(state.hourFrom, 10) * 60;
+    var to = state.hourTo === '' ? MAX_HOUR * 60 : parseInt(state.hourTo, 10) * 60;
+    return startMin < to && endMin > from;
   }
 
   function rowMatches(tr) {
@@ -23,12 +41,16 @@
       // занятия без даты показываем, если совпал день недели
       if (tr.dataset.date && tr.dataset.date !== state.date) return false;
     }
-    var start = parseInt(tr.dataset.startHour, 10);
-    if (!isNaN(start)) {
-      if (state.hourFrom !== '' && start < parseInt(state.hourFrom, 10)) return false;
-      if (state.hourTo !== '' && start >= parseInt(state.hourTo, 10) + 1) return false;
+    var start = parseInt(tr.dataset.startHour, 10) * 60;
+    return intervalMatches(start, start + 60);
+  }
+
+  function blockMatches(el) {
+    if (state.weekday !== 'all' && el.dataset.weekday !== state.weekday) return false;
+    if (state.date) {
+      if (el.dataset.date && el.dataset.date !== state.date) return false;
     }
-    return true;
+    return intervalMatches(toMinutes(el.dataset.start), toMinutes(el.dataset.end));
   }
 
   function apply() {
@@ -45,12 +67,67 @@
         });
         if (rows.length === 0) anyVisible = true;
       }
-      card.classList.toggle('hidden', !(groupOk && anyVisible));
+      card.classList.toggle('hidden', !(groupOk && anyVisible && state.view === 'table'));
       card.classList.toggle('selected', groupOk && state.group !== 'all');
       if (groupOk && anyVisible) visibleCards++;
     });
+    tlCards.forEach(function (card) {
+      var groupOk = (state.group === 'all' || card.dataset.group === state.group);
+      var anyVisible = false;
+      if (groupOk) {
+        var blocks = Array.prototype.slice.call(card.querySelectorAll('.sch-tl-block'));
+        blocks.forEach(function (el) {
+          var ok = blockMatches(el);
+          el.classList.toggle('hidden', !ok);
+          if (ok) anyVisible = true;
+        });
+      }
+      card.classList.toggle('hidden', !(groupOk && state.view === 'timeline'));
+      if (groupOk && anyVisible && state.view === 'timeline') visibleCards++;
+    });
     nothing.classList.toggle('hidden', visibleCards !== 0);
   }
+
+  function buildTimelines() {
+    tlCards.forEach(function (card) {
+      var canvas = card.querySelector('.sch-tl-canvas');
+      if (!canvas || canvas.dataset.built) return;
+      canvas.dataset.built = '1';
+      for (var h = MIN_HOUR + 1; h < MAX_HOUR; h++) {
+        var line = document.createElement('div');
+        line.className = 'sch-tl-line';
+        line.style.top = ((h - MIN_HOUR) * HOUR_PX) + 'px';
+        canvas.appendChild(line);
+      }
+      var nowD = new Date();
+      var nowMin = nowD.getHours() * 60 + nowD.getMinutes();
+      Array.prototype.slice.call(canvas.querySelectorAll('.sch-tl-block')).forEach(function (el) {
+        var start = toMinutes(el.dataset.start);
+        var end = toMinutes(el.dataset.end);
+        if (isNaN(start) || isNaN(end)) { el.classList.add('hidden'); return; }
+        if (end <= start) end = start + 60;
+        el.style.top = ((start - MIN_HOUR * 60) / 60 * HOUR_PX) + 'px';
+        el.style.height = Math.max(((end - start) / 60 * HOUR_PX) - 4, 18) + 'px';
+        if (end <= nowMin) el.classList.add('past');
+      });
+      if (nowMin >= MIN_HOUR * 60 && nowMin <= MAX_HOUR * 60) {
+        var nowLine = document.createElement('div');
+        nowLine.className = 'sch-tl-now';
+        nowLine.style.top = ((nowMin - MIN_HOUR * 60) / 60 * HOUR_PX) + 'px';
+        canvas.appendChild(nowLine);
+      }
+    });
+  }
+
+  function setView(view) {
+    state.view = view;
+    if (view === 'timeline') buildTimelines();
+    setChipActive(viewTableBtn.parentElement, view === 'table' ? viewTableBtn : viewTimelineBtn);
+    apply();
+  }
+
+  viewTableBtn.addEventListener('click', function () { setView('table'); });
+  viewTimelineBtn.addEventListener('click', function () { setView('timeline'); });
 
   groupRow.addEventListener('click', function (e) {
     var chip = e.target.closest('.chip');
@@ -73,7 +150,7 @@
   hourTo.addEventListener('change', function () { state.hourTo = hourTo.value; apply(); });
 
   resetBtn.addEventListener('click', function () {
-    state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '' };
+    state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '', view: state.view };
     dateInput.value = ''; hourFrom.value = ''; hourTo.value = '';
     setChipActive(groupRow, groupRow.querySelector('[data-group="all"]'));
     setChipActive(weekdayRow, weekdayRow.querySelector('[data-weekday="all"]'));

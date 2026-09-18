@@ -1,0 +1,68 @@
+Watching for file changes with StatReloader
+Exception in thread django-main-thread:
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\utils\autoreload.py", line 64, in wrapper
+    fn(*args, **kwargs)
+    ~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\core\management\commands\runserver.py", line 137, in inner_run
+    self.check_migrations()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\core\management\base.py", line 581, in check_migrations
+    executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\executor.py", line 18, in __init__
+    self.loader = MigrationLoader(self.connection)
+                  ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\loader.py", line 58, in __init__
+    self.build_graph()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\loader.py", line 276, in build_graph
+    self.graph.validate_consistency()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\graph.py", line 198, in validate_consistency
+    [n.raise_error() for n in self.node_map.values() if isinstance(n, DummyNode)]
+     ~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\graph.py", line 60, in raise_error
+    raise NodeNotFoundError(self.error_message, self.key, origin=self.origin)
+django.db.migrations.exceptions.NodeNotFoundError: Migration blog.0001_initial dependencies reference nonexistent parent node ('wagtailcore', '0096_referenceindex_referenceindex_source_object_and_more')
+C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\modelcluster\utils.py changed, reloading.
+Performing system checks...
+
+System check identified no issues (0 silenced).
+Watching for file changes with StatReloader
+Exception in thread django-main-thread:
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3824.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\utils\autoreload.py", line 64, in wrapper
+    fn(*args, **kwargs)
+    ~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\core\management\commands\runserver.py", line 137, in inner_run
+    self.check_migrations()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\core\management\base.py", line 581, in check_migrations
+    executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\executor.py", line 18, in __init__
+    self.loader = MigrationLoader(self.connection)
+                  ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\loader.py", line 58, in __init__
+    self.build_graph()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\loader.py", line 276, in build_graph
+    self.graph.validate_consistency()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\graph.py", line 198, in validate_consistency
+    [n.raise_error() for n in self.node_map.values() if isinstance(n, DummyNode)]
+     ~~~~~~~~~~~~~^^
+  File "C:\Users\Hasee\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\django\db\migrations\graph.py", line 60, in raise_error
+    raise NodeNotFoundError(self.error_message, self.key, origin=self.origin)
+django.db.migrations.exceptions.NodeNotFoundError: Migration blog.0002_odtdocumentpage_bloglistingpage_odt_document dependencies reference nonexistent parent node ('wagtailcore', '0096_referenceindex_referenceindex_source_object_and_more')
