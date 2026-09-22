@@ -6,15 +6,20 @@
   var hourFrom = document.getElementById('sch-hour-from');
   var hourTo = document.getElementById('sch-hour-to');
   var resetBtn = document.getElementById('sch-reset');
-  var cards = Array.prototype.slice.call(document.querySelectorAll('.sch-card'));
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#sch-cards > .sch-card'));
   var timeline = document.getElementById('sch-timeline');
-  var tlCards = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-tl-card')) : [];
+  var weekRoot = document.getElementById('sch-week');
+  var dayCols = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-day')) : [];
+  var dayHeaders = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-head-day')) : [];
+  var weekBlocks = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-block')) : [];
   var viewTableBtn = document.getElementById('sch-view-table');
   var viewTimelineBtn = document.getElementById('sch-view-timeline');
   var nothing = document.getElementById('sch-nothing');
 
   var MIN_HOUR = 6, MAX_HOUR = 23, HOUR_PX = 56; // должно совпадать с --hour-h и range(6, 23) в модели
+  var DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // Date.getDay(): 0 = воскресенье
   var state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '', view: 'table' };
+  var weekBuilt = false;
 
   function setChipActive(container, chip) {
     container.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
@@ -34,6 +39,14 @@
     return startMin < to && endMin > from;
   }
 
+  function lessonTime(el) {
+    var start = toMinutes(el.dataset.start);
+    var end = toMinutes(el.dataset.end);
+    if (isNaN(start) || isNaN(end)) return null;
+    if (end <= start) end = start + 60;
+    return { start: start, end: end };
+  }
+
   function rowMatches(tr) {
     if (state.weekday !== 'all' && tr.dataset.weekday !== state.weekday) return false;
     if (state.date) {
@@ -50,11 +63,20 @@
     if (state.date) {
       if (el.dataset.date && el.dataset.date !== state.date) return false;
     }
-    return intervalMatches(toMinutes(el.dataset.start), toMinutes(el.dataset.end));
+    if (state.group !== 'all') {
+      var pks = el.dataset.groups ? el.dataset.groups.split(',') : [];
+      if (pks.indexOf(state.group) === -1) return false;
+    }
+    var t = lessonTime(el);
+    if (!t) return false;
+    return intervalMatches(t.start, t.end);
   }
 
   function apply() {
+    var view = state.view;
     var visibleCards = 0;
+    var weekHasVisible = false;
+
     cards.forEach(function (card) {
       var groupOk = (state.group === 'all' || card.dataset.group === state.group);
       var anyVisible = false;
@@ -67,67 +89,100 @@
         });
         if (rows.length === 0) anyVisible = true;
       }
-      card.classList.toggle('hidden', !(groupOk && anyVisible && state.view === 'table'));
+      card.classList.toggle('hidden', !(view === 'table' && groupOk && anyVisible));
       card.classList.toggle('selected', groupOk && state.group !== 'all');
-      if (groupOk && anyVisible) visibleCards++;
+      if (view === 'table' && groupOk && anyVisible) visibleCards++;
     });
-    tlCards.forEach(function (card) {
-      var groupOk = (state.group === 'all' || card.dataset.group === state.group);
-      var anyVisible = false;
-      if (groupOk) {
-        var blocks = Array.prototype.slice.call(card.querySelectorAll('.sch-tl-block'));
-        blocks.forEach(function (el) {
-          var ok = blockMatches(el);
-          el.classList.toggle('hidden', !ok);
-          if (ok) anyVisible = true;
-        });
-      }
-      card.classList.toggle('hidden', !(groupOk && state.view === 'timeline'));
-      if (groupOk && anyVisible && state.view === 'timeline') visibleCards++;
+
+    weekBlocks.forEach(function (el) {
+      var ok = blockMatches(el);
+      el.classList.toggle('hidden', !ok);
+      if (ok) weekHasVisible = true;
     });
-    nothing.classList.toggle('hidden', visibleCards !== 0);
+    dayCols.forEach(function (col) {
+      col.classList.toggle('dim', state.weekday !== 'all' && col.dataset.day !== state.weekday);
+    });
+    dayHeaders.forEach(function (h) {
+      h.classList.toggle('dim', state.weekday !== 'all' && h.dataset.day !== state.weekday);
+    });
+    if (view === 'week') layoutLanes();
+
+    timeline.classList.toggle('hidden', view !== 'week');
+    var visible = view === 'table' ? visibleCards : (weekHasVisible ? 1 : 0);
+    nothing.classList.toggle('hidden', visible !== 0);
   }
 
-  function buildTimelines() {
-    tlCards.forEach(function (card) {
-      var canvas = card.querySelector('.sch-tl-canvas');
-      if (!canvas || canvas.dataset.built) return;
-      canvas.dataset.built = '1';
-      for (var h = MIN_HOUR + 1; h < MAX_HOUR; h++) {
+  /* Первичная разметка сетки: позиции блоков по времени + линия «сейчас» */
+  function positionWeek() {
+    if (weekBuilt || !weekRoot) return;
+    weekBuilt = true;
+    weekBlocks.forEach(function (el) {
+      var t = lessonTime(el);
+      if (!t) { el.classList.add('hidden'); return; }
+      el.dataset.endMin = String(t.end);
+      el.style.top = (((t.start - MIN_HOUR * 60) / 60) * HOUR_PX) + 'px';
+      el.style.height = Math.max(((t.end - t.start) / 60 * HOUR_PX) - 4, 18) + 'px';
+    });
+    var now = new Date();
+    var todayKey = DAY_KEYS[now.getDay()];
+    var nowMin = now.getHours() * 60 + now.getMinutes();
+    dayHeaders.forEach(function (h) { h.classList.toggle('today', h.dataset.day === todayKey); });
+    dayCols.forEach(function (col) { col.classList.toggle('today', col.dataset.day === todayKey); });
+    if (nowMin >= MIN_HOUR * 60 && nowMin <= MAX_HOUR * 60) {
+      var col = timeline.querySelector('.sch-wk-day[data-day="' + todayKey + '"]');
+      if (col) {
         var line = document.createElement('div');
-        line.className = 'sch-tl-line';
-        line.style.top = ((h - MIN_HOUR) * HOUR_PX) + 'px';
-        canvas.appendChild(line);
+        line.className = 'sch-wk-now';
+        line.style.top = (((nowMin - MIN_HOUR * 60) / 60) * HOUR_PX) + 'px';
+        col.appendChild(line);
       }
-      var nowD = new Date();
-      var nowMin = nowD.getHours() * 60 + nowD.getMinutes();
-      Array.prototype.slice.call(canvas.querySelectorAll('.sch-tl-block')).forEach(function (el) {
+    }
+  }
+
+  /* Раскладка занятий дня по «дорожкам», если они пересекаются по времени */
+  function layoutLanes() {
+    dayCols.forEach(function (col) {
+      var visible = Array.prototype.slice.call(col.querySelectorAll('.sch-wk-block'))
+        .filter(function (el) { return !el.classList.contains('hidden'); })
+        .sort(function (a, b) {
+          var sa = toMinutes(a.dataset.start), sb = toMinutes(b.dataset.start);
+          if (sa !== sb) return sa - sb;
+          var ea = parseInt(a.dataset.endMin || a.dataset.end, 10);
+          var eb = parseInt(b.dataset.endMin || b.dataset.end, 10);
+          return ea - eb;
+        });
+      var laneEnds = [];
+      var placed = [];
+      visible.forEach(function (el) {
         var start = toMinutes(el.dataset.start);
-        var end = toMinutes(el.dataset.end);
-        if (isNaN(start) || isNaN(end)) { el.classList.add('hidden'); return; }
-        if (end <= start) end = start + 60;
-        el.style.top = ((start - MIN_HOUR * 60) / 60 * HOUR_PX) + 'px';
-        el.style.height = Math.max(((end - start) / 60 * HOUR_PX) - 4, 18) + 'px';
-        if (end <= nowMin) el.classList.add('past');
+        var end = parseInt(el.dataset.endMin || el.dataset.end, 10);
+        if (isNaN(start) || isNaN(end)) return;
+        var lane = -1;
+        for (var i = 0; i < laneEnds.length; i++) {
+          if (laneEnds[i] <= start) { lane = i; break; }
+        }
+        if (lane === -1) { lane = laneEnds.length; laneEnds.push(end); }
+        else { laneEnds[lane] = end; }
+        placed.push({ el: el, lane: lane });
       });
-      if (nowMin >= MIN_HOUR * 60 && nowMin <= MAX_HOUR * 60) {
-        var nowLine = document.createElement('div');
-        nowLine.className = 'sch-tl-now';
-        nowLine.style.top = ((nowMin - MIN_HOUR * 60) / 60 * HOUR_PX) + 'px';
-        canvas.appendChild(nowLine);
-      }
+      var laneCount = Math.max(1, laneEnds.length);
+      col.style.setProperty('--lane-w', (100 / laneCount) + '%');
+      placed.forEach(function (p) {
+        p.el.style.left = 'calc(' + p.lane + ' * var(--lane-w))';
+        p.el.style.width = 'calc(var(--lane-w) - 6px)';
+      });
     });
   }
 
   function setView(view) {
     state.view = view;
-    if (view === 'timeline') buildTimelines();
+    if (view === 'week') positionWeek();
     setChipActive(viewTableBtn.parentElement, view === 'table' ? viewTableBtn : viewTimelineBtn);
     apply();
   }
 
   viewTableBtn.addEventListener('click', function () { setView('table'); });
-  viewTimelineBtn.addEventListener('click', function () { setView('timeline'); });
+  viewTimelineBtn.addEventListener('click', function () { setView('week'); });
 
   groupRow.addEventListener('click', function (e) {
     var chip = e.target.closest('.chip');

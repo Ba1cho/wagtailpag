@@ -1,31 +1,48 @@
 <div class="sch-timeline hidden" id="sch-timeline">
-  {% for group in schedule_groups %}
-    <section class="sch-card sch-tl-card" data-group="{{ group.pk }}">
-      <h2 class="sch-card-title">
+  <div class="sch-wk-legend">
+    {% for group in schedule_groups %}
+      <span class="sch-wk-legend-item">
+        <span class="sch-wk-dot {% cycle 'sch-wk-g0' 'sch-wk-g1' 'sch-wk-g2' 'sch-wk-g3' 'sch-wk-g4' 'sch-wk-g5' 'sch-wk-g6' 'sch-wk-g7' %}"></span>
         {{ group.name }}
-        <span class="sch-badge-count">{{ group.lessons.count }} зан.</span>
-      </h2>
-      <div class="sch-tl">
-        <div class="sch-tl-hours">
-          {% for h in hours %}<div class="sch-tl-hour"><span>{{ h }}:00</span></div>{% endfor %}
-        </div>
-        <div class="sch-tl-canvas" data-group="{{ group.slug }}">
-          {% for lesson in group.lessons.all %}
-            <div class="sch-tl-block"
-                 data-weekday="{{ lesson.weekday }}"
-                 data-date="{% if lesson.date %}{{ lesson.date|date:'Y-m-d' }}{% endif %}"
-                 data-start="{{ lesson.start_time|time:'H:i' }}"
-                 data-end="{{ lesson.end_time|time:'H:i' }}">
-              <span class="sch-tl-block-time">{{ lesson.start_time|time:'H:i' }}–{{ lesson.end_time|time:'H:i' }}</span>
-              <span class="sch-tl-block-subject">{{ lesson.subject }}</span>
-              {% if lesson.teacher %}<span class="sch-tl-block-meta">{{ lesson.teacher.name }}</span>{% endif %}
-              {% if lesson.room %}<span class="sch-tl-block-meta">ауд. {{ lesson.room }}</span>{% endif %}
-            </div>
-          {% endfor %}
-        </div>
+      </span>
+    {% endfor %}
+  </div>
+
+  <div class="sch-wk-scroll">
+    <div class="sch-wk" id="sch-week">
+      <div class="sch-wk-head">
+        <div class="sch-wk-corner"></div>
+        {% for value, label in weekdays %}
+          <div class="sch-wk-head-day" data-day="{{ value }}">{{ label }}</div>
+        {% endfor %}
       </div>
-    </section>
-  {% empty %}
-    <p class="sch-nothing">Группы пока не добавлены.</p>
-  {% endfor %}
+      <div class="sch-wk-body">
+        <div class="sch-wk-hours">
+          {% for h in hours %}<div class="sch-wk-hour"><span>{{ h }}:00</span></div>{% endfor %}
+        </div>
+        {% for value, label in weekdays %}
+          <div class="sch-wk-day" data-day="{{ value }}">
+            {% for lesson in week_lessons %}
+              {% if lesson.weekday == value %}
+                <div class="sch-wk-block sch-wk-g{{ lesson.week_color }}"
+                     data-groups="{{ lesson.week_group_pks }}"
+                     data-weekday="{{ lesson.weekday }}"
+                     data-date="{% if lesson.date %}{{ lesson.date|date:'Y-m-d' }}{% endif %}"
+                     data-start="{{ lesson.start_time|time:'H:i' }}"
+                     data-end="{{ lesson.end_time|time:'H:i' }}"
+                     title="{{ lesson.week_group_names }} — {{ lesson.subject }}">
+                  <span class="sch-wk-block-time">{{ lesson.start_time|time:'H:i' }}–{{ lesson.end_time|time:'H:i' }}</span>
+                  <span class="sch-wk-block-subject">{{ lesson.subject }}</span>
+                  <span class="sch-wk-block-groups">{{ lesson.week_group_names }}</span>
+                  {% if lesson.teacher %}<span class="sch-wk-block-meta">{{ lesson.teacher.name }}</span>{% endif %}
+                  {% if lesson.room %}<span class="sch-wk-block-meta">ауд. {{ lesson.room }}</span>{% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <p class="sch-wk-note">Цвет блока — группа. Если занятия по времени совпадают, они располагаются рядом внутри дня.</p>
 </div>

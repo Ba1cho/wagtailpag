@@ -147,6 +147,9 @@ class SchedulePage(Page):
 
     parent_page_types = ["home.HomePage"]
 
+    # размер палитры цветов .sch-wk-g0 ... .sch-wk-g7 в шаблоне таймлайна
+    WEEK_TIMELINE_COLORS = 8
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
         context["schedule_groups"] = (
@@ -154,7 +157,36 @@ class SchedulePage(Page):
             .order_by("name")
         )
         context["weekday_choices"] = Weekday.choices
+        context["weekdays"] = [
+            (Weekday.MONDAY.value, Weekday.MONDAY.label),
+            (Weekday.TUESDAY.value, Weekday.TUESDAY.label),
+            (Weekday.WEDNESDAY.value, Weekday.WEDNESDAY.label),
+            (Weekday.THURSDAY.value, Weekday.THURSDAY.label),
+            (Weekday.FRIDAY.value, Weekday.FRIDAY.label),
+        ]
         context["hours"] = range(6, 23)
+
+        # Общий недельный таймлайн: все занятия всех групп в одной сетке Пн–Пт.
+        # Цвет блока определяется по первой группе занятия, поэтому порядок групп
+        # здесь должен совпадать с порядком schedule_groups (легенда цветов).
+        group_index = {g.pk: i for i, g in enumerate(context["schedule_groups"])}
+        week_lessons = []
+        lessons = (
+            Lesson.objects.select_related("teacher")
+            .prefetch_related("groups")
+            .order_by("weekday", "start_time")
+        )
+        for lesson in lessons:
+            lesson_groups = list(lesson.groups.all())
+            lesson.week_group_pks = ",".join(str(g.pk) for g in lesson_groups)
+            lesson.week_group_names = ", ".join(g.name for g in lesson_groups)
+            lesson.week_color = (
+                group_index.get(lesson_groups[0].pk, 0) % self.WEEK_TIMELINE_COLORS
+                if lesson_groups
+                else self.WEEK_TIMELINE_COLORS - 1
+            )
+            week_lessons.append(lesson)
+        context["week_lessons"] = week_lessons
         return context
 
 
