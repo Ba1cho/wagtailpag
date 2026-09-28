@@ -1,7 +1,5 @@
 """blog/models.py"""
-from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from wagtail.models import Page
-
+from wagtail.search import index
 from django.db import models
 from wagtail.models import Page
 from wagtail.fields import StreamField
@@ -11,6 +9,38 @@ from wagtail.documents.blocks import DocumentChooserBlock
 from odf.odf2xhtml import ODF2XHTML
 from io import BytesIO
 import zipfile
+from django.utils.text import slugify
+
+
+# ---------------------------------------------------------------------------
+# Сниппеты: предметы и прочее по занятиям (люди — в приложении home)
+# ---------------------------------------------------------------------------
+
+class Subject(models.Model):
+    """Учебный предмет (сниппет)."""
+    name = models.CharField("Название предмета", max_length=150, unique=True)
+    slug = models.SlugField("Слаг", max_length=150, unique=True, blank=True,
+                            help_text="Оставьте пустым — заполнится автоматически")
+    description = models.TextField("Описание", blank=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("description"),
+    ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name, allow_unicode=True)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "предмет"
+        verbose_name_plural = "предметы"
+
+
 
 class ODTDocumentPage(Page):
     """

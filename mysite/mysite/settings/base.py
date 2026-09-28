@@ -163,6 +163,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10_000
 
 WAGTAIL_SITE_NAME = "mysite"
 
+# Использовать BigAutoField для новых моделей вместо AutoField (warnings W042)
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 # Search
 # https://docs.wagtail.org/en/stable/topics/search/backends.html
 WAGTAILSEARCH_BACKENDS = {
