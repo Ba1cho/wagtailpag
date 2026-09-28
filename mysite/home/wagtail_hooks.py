@@ -120,8 +120,9 @@ class ScheduleViewSetGroup(SnippetViewSetGroup):
     """Единая группа всех сниппетов расписания с двумя подгруппами."""
     menu_label = "Учебный процесс"
     menu_icon = "folder-open-inverse"
-    menu_order = 100
-    add_to_admin_menu = False
-    add_to_settings_menu = True  # подменю внутри меню «Settings»
+    menu_order = 450  # перед пунктом «Snippets» (order=500)
+    add_to_admin_menu = True  # сворачиваемая группа в главном боковом меню
+    add_to_settings_menu = False
     items = (PeopleViewSetGroup, StudyViewSetGroup)
+
 
