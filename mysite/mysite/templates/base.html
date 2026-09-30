@@ -33,8 +33,48 @@
 
     <body class="{% block body_class %}{% endblock %}">
         {% wagtailuserbar %}
+        {% wagtail_site as current_site_header %}
 
-        {% block content %}{% endblock %}
+        <header class="site-header">
+            <div class="site-header__inner">
+                <a class="site-logo" href="/">
+                    <span class="site-logo__icon">🎓</span>
+                    <span class="site-logo__text">{{ current_site_header.site_name|default:"Мой сайт" }}</span>
+                </a>
+
+                <nav class="site-nav" aria-label="Основная навигация">
+                    {% for item in nav_items %}
+                        <a class="site-nav__link {% if page.url_path == item.url_path %}site-nav__link--active{% endif %}"
+                           href="{% pageurl item %}">{{ item.title }}</a>
+                    {% endfor %}
+                </nav>
+
+                <form class="site-search" action="{% url 'search' %}" method="get" role="search">
+                    <input type="search" name="query" class="site-search__input"
+                           placeholder="Поиск по страницам и документам…"
+                           aria-label="Поиск"
+                           {% if search_query %}value="{{ search_query }}"{% endif %} />
+                    <button type="submit" class="site-search__button" aria-label="Найти">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.5" y2="16.5"></line></svg>
+                    </button>
+                </form>
+            </div>
+        </header>
+
+        <main class="site-main">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="site-footer">
+            <div class="site-footer__inner">
+                <p>© {% now "Y" %} {{ current_site_header.site_name|default:"Мой сайт" }}. Все права защищены.</p>
+                <nav class="site-footer__nav">
+                    {% for item in nav_items %}
+                        <a href="{% pageurl item %}">{{ item.title }}</a>
+                    {% endfor %}
+                </nav>
+            </div>
+        </footer>
 
         {# Global javascript #}
         <script type="text/javascript" src="{% static 'js/mysite.js' %}"></script>

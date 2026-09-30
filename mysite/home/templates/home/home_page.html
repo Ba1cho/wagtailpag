@@ -1,21 +1,33 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static wagtailcore_tags %}
 
 {% block body_class %}template-homepage{% endblock %}
 
-{% block extra_css %}
-
-{% comment %}
-Delete the line below if you're just getting started and want to remove the welcome screen!
-{% endcomment %}
-<link rel="stylesheet" href="{% static 'css/welcome_page.css' %}">
-{% endblock extra_css %}
-
 {% block content %}
+<div class="hero">
+    <div class="container">
+        <h1 class="hero__title">{{ page.title }}</h1>
+        <p class="hero__subtitle">Добро пожаловать! Поиск в шапке сайта находит не только страницы, но и прикреплённые к ним документы.</p>
+        <form class="hero__search" action="{% url 'search' %}" method="get">
+            <input type="search" name="query" class="site-search__input" placeholder="Например: расписание, отчёт, документ…" aria-label="Поиск">
+            <button type="submit" class="btn btn--primary">Найти</button>
+        </form>
+    </div>
+</div>
 
-{% comment %}
-Delete the line below if you're just getting started and want to remove the welcome screen!
-{% endcomment %}
-{% include 'home/welcome_page.html' %}
-
-{% endblock content %}
+<div class="container">
+    {% if sections %}
+    <h2 class="section-title">Разделы сайта</h2>
+    <div class="card-grid">
+        {% for section in sections %}
+        <a class="card card--link" href="{% pageurl section %}">
+            <div class="card__body">
+                <h3 class="card__title">{{ section.title }}</h3>
+                <p class="card__text">Перейти в раздел &rarr;</p>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

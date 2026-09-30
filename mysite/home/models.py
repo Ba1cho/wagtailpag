@@ -2,7 +2,9 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
+from wagtail.fields import RichTextField
 from wagtail.models import Page
+from wagtail.search import index
 
 
 class Curator(models.Model):
@@ -190,5 +192,36 @@ class SchedulePage(Page):
         return context
 
 
+class AboutPage(Page):
+    """Страница «О нас» с RichText-содержимым."""
+
+    parent_page_types = ["home.HomePage"]
+    subpage_types = []
+
+    intro = RichTextField("Вступление", blank=True)
+    body = RichTextField("Содержимое", blank=True)
+
+    search_fields = Page.search_fields + [
+        index.SearchField("intro"),
+        index.SearchField("body"),
+    ]
+
+    content_panels = Page.content_panels + [
+        FieldPanel("intro"),
+        FieldPanel("body"),
+    ]
+
+
 class HomePage(Page):
-    pass
+    """Главная страница: показывает карточки дочерних разделов."""
+
+    subpage_types = [
+        "home.AboutPage",
+        "home.SchedulePage",
+        "blog.BlogListingPage",
+    ]
+
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        context["sections"] = self.get_children().live().in_menu()
+        return context

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block body_class %}template-about{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h1>{{ page.title }}</h1>
+        {% if page.intro %}
+        <div class="page-header__intro rich-text">{{ page.intro|richtext }}</div>
+        {% endif %}
+    </div>
+</div>
+<div class="container">
+    <div class="rich-text">{{ page.body|richtext }}</div>
+</div>
+{% endblock %}

@@ -14,6 +14,7 @@
 </form>
 
 {% if search_results %}
+<h2>Страницы</h2>
 <ul>
     {% for result in search_results %}
     <li>
@@ -32,7 +33,31 @@
 {% if search_results.has_next %}
 <a href="{% url 'search' %}?query={{ search_query|urlencode }}&amp;page={{ search_results.next_page_number }}">Next</a>
 {% endif %}
-{% elif search_query %}
+{% endif %}
+
+{% if document_results %}
+<h2>Документы</h2>
+<ul>
+    {% for doc_result in document_results %}
+    <li>
+        <h4><a href="{{ doc_result.document.url }}">{{ doc_result.document.title }}</a></h4>
+        <p><small>Файл: {{ doc_result.document.filename }}</small></p>
+        {% if doc_result.pages %}
+        <p>Прикреплён на страницах:</p>
+        <ul>
+            {% for page in doc_result.pages %}
+            <li><a href="{% pageurl page %}">{{ page }}</a></li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if not search_results and not document_results %}
+{% if search_query %}
 No results found
+{% endif %}
 {% endif %}
 {% endblock %}

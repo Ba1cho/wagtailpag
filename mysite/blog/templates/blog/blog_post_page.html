@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block content %}
+<article class="article">
+    <header class="page-header">
+        <div class="container">
+            {% if page.date %}
+            <p class="card__meta">{{ page.date }}</p>
+            {% endif %}
+            <h1>{{ page.title }}</h1>
+            {% if page.intro %}
+            <div class="page-header__intro rich-text">{{ page.intro|richtext }}</div>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="rich-text article__body">{{ page.body|richtext }}</div>
+
+        {% if page.attached_documents %}
+        <aside class="attachments">
+            <h2 class="section-title">Прикреплённые документы</h2>
+            <ul class="attachments__list">
+                {% for block in page.attached_documents %}
+                {% with document=block.value %}
+                <li>
+                    <a class="attachments__link" href="{{ document.url }}">
+                        📄 {{ document.title }} <small>({{ document.filename }})</small>
+                    </a>
+                </li>
+                {% endwith %}
+                {% endfor %}
+            </ul>
+        </aside>
+        {% endif %}
+    </div>
+</article>
+{% endblock %}
