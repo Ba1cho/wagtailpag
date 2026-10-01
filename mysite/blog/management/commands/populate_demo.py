@@ -37,6 +37,7 @@ class Command(BaseCommand):
         self._create_blog(home)
         self._create_odt_page()
         self._create_schedule(home)
+        self._link_about(home)
 
         from django.core.management import call_command
         call_command("rebuild_references_index", verbosity=0)
@@ -146,6 +147,34 @@ class Command(BaseCommand):
             home.add_child(instance=schedule)
         schedule.show_in_menus = True
         schedule.save_revision().publish()
+
+    def _link_about(self, home):
+        """Добавляет в RichText страницы «О колледже» живые ссылки на разделы.
+
+        Внутренние ссылки в RichText хранятся Wagtail'ом как
+        ``<a linktype="page" id="N">Текст</a>``: href вычисляется при рендере
+        по id, поэтому смена slug или перенос страницы не ломают ссылку.
+        Текст же сохраняется в HTML — синхронизировать его с актуальным
+        заголовком можно командой ``manage.py sync_richtext_links``.
+        """
+        from home.models import AboutPage, SchedulePage
+
+        about = AboutPage.objects.child_of(home).first()
+        if not about or "Полезные ссылки" in about.body:
+            return
+        links = []
+        schedule = SchedulePage.objects.child_of(home).first()
+        if schedule:
+            links.append(
+                f'<a linktype="page" id="{schedule.id}">расписанием занятий</a>'
+            )
+        if self.listing:
+            links.append(
+                f'<a linktype="page" id="{self.listing.id}">Статьи и документы</a>'
+            )
+        if links:
+            about.body = about.body + "<p>Полезные ссылки: " + " и ".join(links) + ".</p>"
+            about.save_revision().publish()
 
     def _get_posts_data(self):
         return [
