@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=(blog.models.ODTDocumentSearchMixin, 'wagtailcore.page'),
+            bases=('wagtailcore.page',),
         ),
         migrations.AddField(
             model_name='bloglistingpage',

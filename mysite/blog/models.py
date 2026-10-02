@@ -43,49 +43,7 @@ class Subject(models.Model):
 
 
 
-class ODTDocumentSearchMixin:
-    """
-    Общая логика для страниц с прикреплённым документом:
-    извлечение текста документа для поискового индекса Wagtail.
-    """
-
-    # Метки-заглушки, которые возвращает convert_odt_to_html при ошибке
-    _PLACEHOLDER_PREFIXES = ("<p>Документ", "<p>Файл", "<p>Ошибка")
-
-    def get_document_object(self):
-        """Возвращает объект wagtail.documents.Document или None."""
-        if not self.odt_document:
-            return None
-        try:
-            return self.odt_document[0].value
-        except Exception:
-            return None
-
-    def get_document_text(self):
-        """Текст содержимого документа (для ODT — через конвертацию в HTML)."""
-        html = self.convert_odt_to_html()
-        if not html or html.startswith(self._PLACEHOLDER_PREFIXES):
-            return ""
-        text = re.sub(r"<[^>]+>", " ", html)
-        return " ".join(text.split())
-
-    def get_document_search_text(self):
-        """Название, имя файла и содержимое документа — для поиска по страницам."""
-        document = self.get_document_object()
-        if not document:
-            return ""
-        parts = [document.title or "", document.filename or ""]
-        text = self.get_document_text()
-        if text:
-            parts.append(text)
-        return " ".join(part for part in parts if part)
-
-    search_fields = Page.search_fields + [
-        index.SearchField("get_document_search_text", partial_match=True),
-    ]
-
-
-class ODTDocumentPage(ODTDocumentSearchMixin, Page):
+class ODTDocumentPage(Page):
     """
     Страница для загрузки ODT-файла и отображения его HTML-версии
     """
@@ -152,7 +110,7 @@ class ODTDocumentPage(ODTDocumentSearchMixin, Page):
         context = super().get_context(request, *args, **kwargs)
         context['document_html'] = self.convert_odt_to_html()
         return context
-class BlogListingPage(ODTDocumentSearchMixin, Page):
+class BlogListingPage(Page):
     """
     Страница-листинг статей блога. Также может нести прикреплённый ODT-документ.
     """
@@ -236,7 +194,7 @@ class BlogListingPage(ODTDocumentSearchMixin, Page):
             return f"<p>Ошибка при обработке документа: {str(e)}</p>"
 
 
-class BlogPostPage(ODTDocumentSearchMixin, Page):
+class BlogPostPage(Page):
     """
     Статья блога: RichText-интро, RichText-тело и (опционально)
     прикреплённые документы через DocumentChooserBlock.
@@ -258,7 +216,6 @@ class BlogPostPage(ODTDocumentSearchMixin, Page):
     search_fields = Page.search_fields + [
         index.SearchField('intro'),
         index.SearchField('body'),
-        index.SearchField('get_attachments_search_text', partial_match=True),
     ]
 
     content_panels = Page.content_panels + [
@@ -269,20 +226,4 @@ class BlogPostPage(ODTDocumentSearchMixin, Page):
     ]
 
     parent_page_types = ['blog.BlogListingPage']
-
-    def get_document_object(self):
-        """Для совместимости с поиском: у статьи несколько документов."""
-        return None
-
-    def get_attachments_search_text(self):
-        """Название + имя файла каждого прикреплённого документа."""
-        if not self.attached_documents:
-            return ""
-        parts = []
-        for block in self.attached_documents:
-            document = block.value
-            if document:
-                parts.append(document.title or "")
-                parts.append(document.filename or "")
-        return " ".join(p for p in parts if p)
 

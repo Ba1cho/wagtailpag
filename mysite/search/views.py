@@ -20,40 +20,55 @@ def _get_document_model():
 
 def search_documents(query):
     """
-    Ищет документы по названию и имени файла и возвращает список словарей:
-    {'document': Document, 'pages': [Page, ...]}
+    Модельно-независимый поиск документов и страниц, где они используются.
 
-    Страницы, на которых прикреплён документ (в StreamField, RichText,
-    DocumentChooser и т.д.), находятся через ReferenceIndex, который Wagtail
-    ведёт автоматически для всех типов ссылок на документы.
+    Ищет документы по названию и имени файла, а страницы, ссылающиеся на
+    документ (RichText <a linktype="document">, StreamField DocumentChooser,
+    ForeignKey и т.д.), находит через ReferenceIndex — Wagtail ведёт его
+    автоматически для всех типов страниц, поэтому никакие специальные
+    методы в моделях страниц не нужны. Текст ссылки в RichText может быть
+    любым (в т.ч. устаревшим после переименования) — ссылка резолвится по
+    id документа, а не по тексту.
     """
     document_model = _get_document_model()
     documents = document_model.objects.filter(
         Q(title__icontains=query) | Q(file__icontains=query)
     ).distinct()
 
+    if not documents:
+        return []
+
     document_content_type = ContentType.objects.get_for_model(document_model)
+    document_ids = {document.pk: document for document in documents}
+
+    # Входящие ссылки на найденные документы — одним запросом
+    refs = ReferenceIndex.objects.filter(
+        to_content_type_id=document_content_type.pk,
+        to_object_id__in=document_ids,
+    ).order_by("to_object_id")
+
+    pages_by_document = {pk: set() for pk in document_ids}
+    page_ids = set()
+    for ref in refs:
+        model = ref.content_type.model_class()
+        # интересуют только ссылки, исходящие из страниц
+        if model is not None and issubclass(model, Page):
+            to_id = int(ref.to_object_id)
+            pages_by_document.setdefault(to_id, set()).add(int(ref.object_id))
+            page_ids.add(int(ref.object_id))
+
+    specific_pages = {}
+    if page_ids:
+        for page in Page.objects.filter(id__in=page_ids).specific():
+            specific_pages[page.pk] = page
 
     results = []
-    for document in documents:
-        page_ids = []
-        # входящие ссылки на документ: Wagtail ведёт их автоматически
-        # (StreamField, RichText, DocumentChooser, ForeignKey и т.д.)
-        refs = ReferenceIndex.objects.filter(
-            to_content_type_id=document_content_type.pk,
-            to_object_id=document.pk,
-        )
-        for ref in refs:
-            model = ref.content_type.model_class()
-            # нас интересуют только ссылки, исходящие из страниц
-            if model is not None and issubclass(model, Page):
-                if ref.object_id not in page_ids:
-                    page_ids.append(ref.object_id)
-        pages = []
-        if page_ids:
-            pages = list(
-                Page.objects.live().filter(id__in=page_ids).specific()
-            )
+    for pk, document in document_ids.items():
+        pages = [
+            specific_pages[pid]
+            for pid in sorted(pages_by_document[pk])
+            if pid in specific_pages and specific_pages[pid].live
+        ]
         results.append({"document": document, "pages": pages})
     return results
 
