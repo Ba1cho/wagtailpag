@@ -1,6 +1,9 @@
+import re
+
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
+from django.db import models
 from django.template.response import TemplateResponse
 
 from wagtail.documents import get_document_model
@@ -16,6 +19,29 @@ from wagtail.models import Page, ReferenceIndex
 
 def _get_document_model():
     return get_document_model()
+
+
+# Ссылка на документ в RichText (DB-формат Wagtail):
+# <a linktype="document" id="7">Пользовательский текст ссылки</a>
+DOCUMENT_LINK_RE = re.compile(
+    r'<a\s[^>]*linktype="document"[^>]*\bid="(?P<id>\d+)"[^>]*>'
+    r"(?P<text>.*?)</a>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _iter_document_link_texts(page):
+    """Извлекает (id_документа, текст_ссылки) из RichText-полей страницы."""
+    for field in page.specific_class._meta.get_fields():
+        if not isinstance(field, models.TextField) or not hasattr(
+            page, field.attname
+        ):
+            continue
+        html = getattr(page, field.attname) or ""
+        if "linktype=" not in html:
+            continue
+        for match in DOCUMENT_LINK_RE.finditer(html):
+            yield int(match.group("id")), match.group("text")
 
 
 def search_documents(query):
@@ -34,9 +60,6 @@ def search_documents(query):
     documents = document_model.objects.filter(
         Q(title__icontains=query) | Q(file__icontains=query)
     ).distinct()
-
-    if not documents:
-        return []
 
     document_content_type = ContentType.objects.get_for_model(document_model)
     document_ids = {document.pk: document for document in documents}
@@ -62,14 +85,33 @@ def search_documents(query):
         for page in Page.objects.filter(id__in=page_ids).specific():
             specific_pages[page.pk] = page
 
+    # Дополнительно: поиск по тексту ссылок на документы в RichText.
+    # Текст ссылки может быть изменён редактором и не совпадать с названием
+    # документа — тогда по нему нужно тоже находить документ и страницу.
+    rich_pages = Page.objects.filter(live=True).specific().iterator()
+    for page in rich_pages:
+        if page.pk in specific_pages:
+            continue  # уже найдены через ReferenceIndex
+        for doc_id, link_text in _iter_document_link_texts(page):
+            if query.lower() in link_text.lower():
+                if doc_id not in document_ids:
+                    document = document_model.objects.filter(pk=doc_id).first()
+                    if document is None:
+                        continue
+                    document_ids[doc_id] = document
+                    pages_by_document[doc_id] = set()
+                pages_by_document[doc_id].add(page.pk)
+                specific_pages[page.pk] = page
+
     results = []
     for pk, document in document_ids.items():
         pages = [
             specific_pages[pid]
-            for pid in sorted(pages_by_document[pk])
+            for pid in sorted(pages_by_document.get(pk, set()))
             if pid in specific_pages and specific_pages[pid].live
         ]
-        results.append({"document": document, "pages": pages})
+        if pages:
+            results.append({"document": document, "pages": pages})
     return results
 
 
