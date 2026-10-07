@@ -34,7 +34,7 @@
                   <span class="sch-wk-block-time">{{ lesson.start_time|time:'H:i' }}–{{ lesson.end_time|time:'H:i' }}</span>
                   <span class="sch-wk-block-subject">{{ lesson.subject }}</span>
                   <span class="sch-wk-block-groups">{{ lesson.week_group_names }}</span>
-                  {% if lesson.teacher %}<span class="sch-wk-block-meta">{{ lesson.teacher.name }}</span>{% endif %}
+                  {% if lesson.teacher %}<span class="sch-wk-block-meta">{{ lesson.teacher }}</span>{% endif %}
                   {% if lesson.room %}<span class="sch-wk-block-meta">ауд. {{ lesson.room }}</span>{% endif %}
                 </div>
               {% endif %}

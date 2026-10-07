@@ -1,10 +1,13 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from wagtail import blocks
 from wagtail.admin.panels import FieldPanel, MultiFieldPanel
-from wagtail.fields import RichTextField
+from wagtail.fields import RichTextField, StreamField
 from wagtail.models import Page
 from wagtail.search import index
+
+from blog.models import Subject
 
 
 class Curator(models.Model):
@@ -98,7 +101,14 @@ class Teacher(models.Model):
 
 
 class Lesson(models.Model):
-    subject = models.CharField(_("Предмет"), max_length=150)
+    subject = models.ForeignKey(
+        Subject,
+        verbose_name=_("Предмет"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lessons",
+    )
     teacher = models.ForeignKey(
         Teacher,
         verbose_name=_("Преподаватель"),
@@ -144,6 +154,16 @@ class Lesson(models.Model):
         ordering = ["weekday", "start_time"]
 
 
+class LessonBlock(blocks.StructBlock):
+    subject = blocks.CharBlock(max_length=150, label="Предмет")
+    weekday = blocks.ChoiceBlock(Weekday.choices, label="День недели")
+    date = blocks.DateBlock(required=False, label="Дата")
+    start_time = blocks.TimeBlock(label="Начало")
+    end_time = blocks.TimeBlock(label="Конец")
+    room = blocks.CharBlock(max_length=50, required=False, label="Аудитория")
+    groups = blocks.CharBlock(max_length=200, required=False, label="Группы (через запятую)")
+
+
 class SchedulePage(Page):
     """Страница с расписанием занятий по группам."""
 
@@ -151,6 +171,21 @@ class SchedulePage(Page):
 
     # размер палитры цветов .sch-wk-g0 ... .sch-wk-g7 в шаблоне таймлайна
     WEEK_TIMELINE_COLORS = 8
+
+    # Каждый блок — одно занятие недели.
+    lessons = StreamField(
+        [("lesson", LessonBlock())],
+        blank=True,
+        use_json_field=True,
+    )
+
+    search_fields = Page.search_fields + [
+        index.SearchField("schedule_search_content"),
+    ]
+
+    content_panels = Page.content_panels + [
+        FieldPanel("lessons"),
+    ]
 
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
@@ -168,28 +203,86 @@ class SchedulePage(Page):
         ]
         context["hours"] = range(6, 23)
 
-        # Общий недельный таймлайн: все занятия всех групп в одной сетке Пн–Пт.
-        # Цвет блока определяется по первой группе занятия, поэтому порядок групп
-        # здесь должен совпадать с порядком schedule_groups (легенда цветов).
-        group_index = {g.pk: i for i, g in enumerate(context["schedule_groups"])}
+        schedule_groups = context["schedule_groups"]
+        group_index = {g.pk: i for i, g in enumerate(schedule_groups)}
+        name_to_pk = {}
+        for group in schedule_groups:
+            for name in [n.strip() for n in group.name.split(",") if n.strip()]:
+                name_to_pk[name.lower()] = group.pk
+
         week_lessons = []
-        lessons = (
-            Lesson.objects.select_related("teacher")
-            .prefetch_related("groups")
-            .order_by("weekday", "start_time")
-        )
-        for lesson in lessons:
-            lesson_groups = list(lesson.groups.all())
-            lesson.week_group_pks = ",".join(str(g.pk) for g in lesson_groups)
-            lesson.week_group_names = ", ".join(g.name for g in lesson_groups)
-            lesson.week_color = (
-                group_index.get(lesson_groups[0].pk, 0) % self.WEEK_TIMELINE_COLORS
-                if lesson_groups
-                else self.WEEK_TIMELINE_COLORS - 1
-            )
+        lessons_by_group = {}
+
+        for block in (self.lessons or []):
+            value = block.value or {}
+            subject = value.get("subject") or ""
+            weekday = value.get("weekday")
+            date = value.get("date")
+            start_time = value.get("start_time")
+            end_time = value.get("end_time")
+            room = value.get("room") or ""
+            groups_text = value.get("groups") or ""
+            groups = [g.strip() for g in str(groups_text).split(",") if g.strip()]
+
+            lesson_groups = []
+            for gname in groups:
+                pk = name_to_pk.get(gname.lower())
+                if pk is not None:
+                    lesson_groups.append({"pk": pk, "name": gname})
+
+            group_names = ", ".join(g["name"] for g in lesson_groups)
+
+            lesson = {
+                "weekday": weekday,
+                "date": date,
+                "start_time": start_time,
+                "end_time": end_time,
+                "room": room,
+                "subject": subject,
+                "teacher": value.get("teacher") or "",
+                "week_group_names": group_names,
+                "week_group_pks": ",".join(str(g["pk"]) for g in lesson_groups),
+                "week_color": (
+                    group_index.get(lesson_groups[0]["pk"], 0)
+                    % self.WEEK_TIMELINE_COLORS
+                    if lesson_groups
+                    else self.WEEK_TIMELINE_COLORS - 1
+                ),
+            }
             week_lessons.append(lesson)
+            for group in lesson_groups:
+                lessons_by_group.setdefault(group["pk"], []).append(lesson)
+
         context["week_lessons"] = week_lessons
+
+        schedule_groups_with_lessons = []
+        for group in schedule_groups:
+            schedule_groups_with_lessons.append(
+                {"group": group, "lessons": lessons_by_group.get(group.pk, [])}
+            )
+        context["schedule_groups_with_lessons"] = schedule_groups_with_lessons
         return context
+
+    def schedule_search_content(self):
+        parts = [self.title]
+        for block in (self.lessons or []):
+            value = block.value or {}
+            parts.append(
+                " ".join(
+                    str(value.get(field)) or ""
+                    for field in (
+                        "subject",
+                        "teacher",
+                        "weekday",
+                        "date",
+                        "start_time",
+                        "end_time",
+                        "room",
+                        "groups",
+                    )
+                )
+            )
+        return " ".join(parts)
 
 
 class AboutPage(Page):
