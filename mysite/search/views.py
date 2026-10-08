@@ -7,6 +7,8 @@ from django.db import models
 from django.template.response import TemplateResponse
 
 from wagtail.documents import get_document_model
+from wagtail.documents.models import Document
+from wagtail.fields import StreamField
 from wagtail.models import Page, ReferenceIndex
 
 # To enable logging of search queries for use with the "Promoted search results" module
@@ -30,18 +32,28 @@ DOCUMENT_LINK_RE = re.compile(
 )
 
 
-def _iter_document_link_texts(page):
-    """Извлекает (id_документа, текст_ссылки) из RichText-полей страницы."""
-    for field in page.specific_class._meta.get_fields():
-        if not isinstance(field, models.TextField) or not hasattr(
-            page, field.attname
-        ):
-            continue
-        html = getattr(page, field.attname) or ""
-        if "linktype=" not in html:
-            continue
-        for match in DOCUMENT_LINK_RE.finditer(html):
-            yield int(match.group("id")), match.group("text")
+def _iter_document_references(page):
+    """
+    Извлекает (id_документа, текст_ссылки) из RichText- и StreamField-полей страницы.
+
+    В RichText текстом ссылки является HTML-текст ссылки.
+    В StreamField (блок DocumentChooserBlock) — значение документа, которое
+    используется как текст ссылки при поиске: название документа или его файл.
+    """
+    specific = page.specific_class
+    for field in specific._meta.get_fields():
+        # 1) RichText-текстовые поля
+        if isinstance(field, models.TextField) and hasattr(page, field.attname):
+            html = getattr(page, field.attname) or ""
+            if "linktype=" in html:
+                for match in DOCUMENT_LINK_RE.finditer(html):
+                    yield int(match.group("id")), match.group("text")
+        # 2) StreamField: блоки DocumentChooserBlock хранят Document в value
+        elif isinstance(field, StreamField) and hasattr(page, field.attname):
+            for block in getattr(page, field.attname) or ():
+                value = block.value
+                if isinstance(value, Document):
+                    yield value.pk, value.title or value.filename
 
 
 def search_documents(query):
@@ -85,15 +97,16 @@ def search_documents(query):
         for page in Page.objects.filter(id__in=page_ids).specific():
             specific_pages[page.pk] = page
 
-    # Дополнительно: поиск по тексту ссылок на документы в RichText.
-    # Текст ссылки может быть изменён редактором и не совпадать с названием
-    # документа — тогда по нему нужно тоже находить документ и страницу.
+    # Дополнительно: поиск по тексту ссылок на документы в RichText и
+    # прикреплённых в StreamField документах.
+    # Текст ссылки в RichText может быть изменён редактором и не совпадать с
+    # названием документа — тогда по нему нужно тоже находить документ и страницу.
     rich_pages = Page.objects.filter(live=True).specific().iterator()
     for page in rich_pages:
         if page.pk in specific_pages:
             continue  # уже найдены через ReferenceIndex
-        for doc_id, link_text in _iter_document_link_texts(page):
-            if query.lower() in link_text.lower():
+        for doc_id, ref_text in _iter_document_references(page):
+            if query.lower() in ref_text.lower():
                 if doc_id not in document_ids:
                     document = document_model.objects.filter(pk=doc_id).first()
                     if document is None:
