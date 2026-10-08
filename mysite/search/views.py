@@ -32,13 +32,64 @@ DOCUMENT_LINK_RE = re.compile(
 )
 
 
+def _iter_document_references_from_block(block_def, value):
+    """
+    Рекурсивно обходит блоки StreamField, ListBlock и StructBlock и находит
+    ссылки/значения документов.
+
+    Возвращает (id_документа, текст_ссылки).
+    """
+    # Блок DocumentChooserBlock хранит выбранный Document в value
+    if isinstance(value, Document):
+        yield value.pk, value.title or value.filename
+        return
+
+    # Если внутри что-то имеет HTML-ссылку на документ, например RichText
+    if isinstance(value, str) and "linktype=" in value:
+        for match in DOCUMENT_LINK_RE.finditer(value):
+            yield int(match.group("id")), match.group("text")
+
+    # Вложенный StreamField
+    if hasattr(block_def, "stream_block"):
+        if not value:
+            return
+        for child_block in value:
+            yield from _iter_document_references_from_block(
+                child_block.block, child_block.value
+            )
+        return
+
+    # StructBlock
+    if hasattr(block_def, "block_list"):
+        if not value:
+            return
+        for child_def in block_def.block_list:
+            child_value = None
+            if hasattr(value, "get"):
+                child_value = value.get(child_def.name)
+            else:
+                child_value = getattr(value, child_def.name, None)
+            yield from _iter_document_references_from_block(child_def, child_value)
+        return
+
+    # ListBlock
+    if hasattr(block_def, "child_block"):
+        if not value:
+            return
+        for item in value:
+            yield from _iter_document_references_from_block(
+                block_def.child_block, item
+            )
+        return
+
+
 def _iter_document_references(page):
     """
     Извлекает (id_документа, текст_ссылки) из RichText- и StreamField-полей страницы.
 
     В RichText текстом ссылки является HTML-текст ссылки.
-    В StreamField (блок DocumentChooserBlock) — значение документа, которое
-    используется как текст ссылки при поиске: название документа или его файл.
+    В StreamField (блок DocumentChooserBlock и блоги со rich-текстом) — значение
+    документа или текст ссылки, используемый как текст ссылки при поиске.
     """
     specific = page.specific_class
     for field in specific._meta.get_fields():
@@ -48,12 +99,12 @@ def _iter_document_references(page):
             if "linktype=" in html:
                 for match in DOCUMENT_LINK_RE.finditer(html):
                     yield int(match.group("id")), match.group("text")
-        # 2) StreamField: блоки DocumentChooserBlock хранят Document в value
+        # 2) StreamField — рекурсивно проходим по блокам
         elif isinstance(field, StreamField) and hasattr(page, field.attname):
             for block in getattr(page, field.attname) or ():
-                value = block.value
-                if isinstance(value, Document):
-                    yield value.pk, value.title or value.filename
+                yield from _iter_document_references_from_block(
+                    block.block, block.value
+                )
 
 
 def search_documents(query):

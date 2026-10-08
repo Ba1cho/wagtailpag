@@ -43,6 +43,68 @@ class Subject(models.Model):
 
 
 
+# ============================================================================
+# Блоки для демо-страниц с StreamField
+# ============================================================================
+
+class ListItemBlock(blocks.RichTextBlock):
+    """Один элемент списка."""
+    pass
+
+
+class InfoBlock(blocks.StructBlock):
+    """
+    Структурированный блок: заголовок, текст, теги.
+    """
+    heading = blocks.CharBlock(required=True, help_text="Заголовок блока")
+    text = blocks.RichTextBlock(required=True, help_text="Текст блока")
+    tags = blocks.ListBlock(
+        blocks.CharBlock(max_length=100),
+        required=False,
+        help_text="Теги блока",
+    )
+
+
+class ContentStreamBlock(blocks.StreamBlock):
+    """
+    Пример стрим-поля: richtext, list, struct, документ.
+    """
+    richtext = blocks.RichTextBlock()
+    list_items = blocks.ListBlock(ListItemBlock())
+    info = InfoBlock()
+    document = DocumentChooserBlock(required=False)
+
+
+# ============================================================================
+# Демо-страница с RichText / ListBlock / StructBlock внутри StreamField
+# ============================================================================
+
+class StreamFieldDemoPage(Page):
+    """Страница для демонстрации поиска по StreamField с listblock, structblock, richtext."""
+
+    content = StreamField(
+        ContentStreamBlock(),
+        use_json_field=True,
+        blank=True,
+        null=True,
+    )
+
+    # Указываем, что StreamField участвует в поиске
+    search_fields = Page.search_fields + [
+        index.SearchField('content'),
+    ]
+
+    content_panels = Page.content_panels + [
+        FieldPanel('content'),
+    ]
+
+    parent_page_types = ['home.HomePage']
+    subpage_types = []
+
+    def __str__(self):
+        return self.title
+
+
 class ODTDocumentPage(Page):
     """
     Страница для загрузки ODT-файла и отображения его HTML-версии
@@ -136,6 +198,7 @@ class BlogListingPage(Page):
 
     search_fields = Page.search_fields + [
         index.SearchField('intro'),
+        index.SearchField('odt_document'),
     ]
 
     parent_page_types = ['home.HomePage']
@@ -216,6 +279,7 @@ class BlogPostPage(Page):
     search_fields = Page.search_fields + [
         index.SearchField('intro'),
         index.SearchField('body'),
+        index.SearchField('attached_documents'),
     ]
 
     content_panels = Page.content_panels + [

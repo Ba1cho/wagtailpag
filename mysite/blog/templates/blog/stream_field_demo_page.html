@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ page.title }}</h1>
+</div>
+
+<div class="container">
+    {% for block in page.content %}
+        <div class="stream-block">
+            {% if block.block_type == 'richtext' %}
+                <div class="stream-richtext">
+                    {{ block.value|richtext }}
+                </div>
+            {% elif block.block_type == 'list_items' %}
+                <ul class="stream-list">
+                    {% for item in block.value %}
+                        <li>{{ item|richtext }}</li>
+                    {% endfor %}
+                </ul>
+            {% elif block.block_type == 'info' %}
+                <div class="stream-info">
+                    <h2>{{ block.value.heading }}</h2>
+                    <div class="stream-info-text">
+                        {{ block.value.text|richtext }}
+                    </div>
+                    {% if block.value.tags %}
+                        <div class="stream-info-tags">
+                            {{ block.value.tags|join:", " }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
