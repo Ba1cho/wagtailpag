@@ -1,10 +1,10 @@
 from django.core.management.base import BaseCommand
 
-from wagtail.models import Page
+from search.views import search_pages
 
 
 class Command(BaseCommand):
-    help = "Search published pages by query and print results to console."
+    help = "Search published pages by query (full text + partial word) and print results to console."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -27,7 +27,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"Searching pages for: {query!r}")
         )
 
-        pages = Page.objects.live().search(query)
+        pages = search_pages(query)
 
         if not pages:
             self.stdout.write("No pages found.")
