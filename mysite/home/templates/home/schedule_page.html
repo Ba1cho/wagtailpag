@@ -54,7 +54,10 @@
   .sch-wk { min-width:780px; }
   .sch-wk-head { display:flex; background:var(--bg); border-bottom:2px solid var(--border); }
   .sch-wk-corner { flex:0 0 64px; width:64px; border-right:1px solid var(--border); }
-  .sch-wk-head-day { flex:1; text-align:center; font-size:.82rem; font-weight:700; padding:.55rem .3rem; border-right:1px solid var(--border); color:var(--text); }
+  .sch-wk-head-day { flex:1; text-align:center; font-size:.82rem; font-weight:700; padding:.45rem .3rem; border-right:1px solid var(--border); color:var(--text); display:flex; flex-direction:column; gap:.1rem; }
+  .sch-wk-head-date { font-size:.85rem; }
+  .sch-wk-head-wd { font-weight:500; font-size:.72rem; color:var(--muted); }
+  .sch-wk-head-day.today .sch-wk-head-wd { color:var(--accent); }
   .sch-wk-head-day:last-child { border-right:none; }
   .sch-wk-head-day.today { color:var(--accent); }
   .sch-wk-head-day.dim { opacity:.4; }
@@ -93,12 +96,12 @@
 {% block content %}
 <div class="sch">
   <h1>{{ page.title }}</h1>
-  <p class="sch-sub">Расписание занятий по группам. Используйте фильтры ниже.</p>
+  <p class="sch-sub">Расписание занятий по датам и группам. Используйте фильтры ниже.</p>
 
   {% include "home/schedule_filters.html" %}
   <div class="sch-view-toggle">
-    <button class="chip active" id="sch-view-table" type="button">Таблица</button>
-    <button class="chip" id="sch-view-timeline" type="button">Таймлайн (Пн–Пт)</button>
+    <button class="chip active" id="sch-view-table" type="button">Группы</button>
+    <button class="chip" id="sch-view-timeline" type="button">Таймлайн по датам</button>
   </div>
   {% include "home/schedule_cards.html" %}
   {% include "home/schedule_timeline.html" %}

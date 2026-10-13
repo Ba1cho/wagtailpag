@@ -17,9 +17,15 @@
   var nothing = document.getElementById('sch-nothing');
 
   var MIN_HOUR = 6, MAX_HOUR = 23, HOUR_PX = 56; // должно совпадать с --hour-h и range(6, 23) в модели
-  var DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']; // Date.getDay(): 0 = воскресенье
   var state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '', view: 'table' };
   var weekBuilt = false;
+
+  /* Локальная дата в формате YYYY-MM-DD (совпадает с data-day/data-date из Django). */
+  function isoDate(d) {
+    var month = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + month + '-' + day;
+  }
 
   function setChipActive(container, chip) {
     container.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('active'); });
@@ -47,22 +53,25 @@
     return { start: start, end: end };
   }
 
+  /* Фильтр по дню недели и дате (у каждого занятия есть конкретная дата). */
+  function weekdayMatches(el) {
+    if (state.weekday === 'all') return true;
+    return el.dataset.weekday === state.weekday;
+  }
+
+  function dateMatches(el) {
+    if (!state.date) return true;
+    return el.dataset.date === state.date;
+  }
+
   function rowMatches(tr) {
-    if (state.weekday !== 'all' && tr.dataset.weekday !== state.weekday) return false;
-    if (state.date) {
-      // если у занятия указана конкретная дата — она должна совпасть;
-      // занятия без даты показываем, если совпал день недели
-      if (tr.dataset.date && tr.dataset.date !== state.date) return false;
-    }
+    if (!weekdayMatches(tr) || !dateMatches(tr)) return false;
     var start = parseInt(tr.dataset.startHour, 10) * 60;
     return intervalMatches(start, start + 60);
   }
 
   function blockMatches(el) {
-    if (state.weekday !== 'all' && el.dataset.weekday !== state.weekday) return false;
-    if (state.date) {
-      if (el.dataset.date && el.dataset.date !== state.date) return false;
-    }
+    if (!weekdayMatches(el) || !dateMatches(el)) return false;
     if (state.group !== 'all') {
       var pks = el.dataset.groups ? el.dataset.groups.split(',') : [];
       if (pks.indexOf(state.group) === -1) return false;
@@ -124,7 +133,7 @@
       el.style.height = Math.max(((t.end - t.start) / 60 * HOUR_PX) - 4, 18) + 'px';
     });
     var now = new Date();
-    var todayKey = DAY_KEYS[now.getDay()];
+    var todayKey = isoDate(now);
     var nowMin = now.getHours() * 60 + now.getMinutes();
     dayHeaders.forEach(function (h) { h.classList.toggle('today', h.dataset.day === todayKey); });
     dayCols.forEach(function (col) { col.classList.toggle('today', col.dataset.day === todayKey); });

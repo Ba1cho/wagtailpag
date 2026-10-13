@@ -3,14 +3,14 @@
     <span class="sch-filter-label">Группы</span>
     <button class="chip active" data-group="all">Все группы</button>
     {% for group in schedule_groups %}
-      <button class="chip" data-group="{{ group.pk }}">{{ group.name }}</button>
+      <button class="chip" data-group="{{ group.pk }}">{{ group.title }}</button>
     {% endfor %}
   </div>
   <div class="sch-filter-row" id="sch-weekday-row">
     <span class="sch-filter-label">День недели</span>
     <button class="chip active" data-weekday="all">Любой</button>
-    {% for value, label in weekday_choices %}
-      <button class="chip" data-weekday="{{ value }}">{{ label }}</button>
+    {% for key, label in weekdays %}
+      <button class="chip" data-weekday="{{ key }}">{{ label }}</button>
     {% endfor %}
   </div>
   <div class="sch-filter-row">
