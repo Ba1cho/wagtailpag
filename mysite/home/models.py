@@ -2,12 +2,12 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from modelcluster.fields import ParentalKey
-from modelcluster.models import ClusterableModel
 
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel, PageChooserPanel
 from wagtail.fields import StreamField
 from wagtail.models import Page
+from wagtail.snippets.models import register_snippet
 
 
 # ---------------------------------------------------------------------------
@@ -56,10 +56,11 @@ class TeacherPage(Page):
         verbose_name_plural = _("Преподаватели")
 
 
-class GroupStudent(ClusterableModel):
-    """Студент, принадлежащий странице группы (инлайн-объект)."""
+@register_snippet
+class GroupStudent(models.Model):
+    """Студент: отдельная модель со ссылкой (ForeignKey) на свою группу."""
 
-    group = ParentalKey(
+    group = models.ForeignKey(
         "home.GroupPage",
         verbose_name=_("Группа"),
         on_delete=models.CASCADE,
@@ -71,6 +72,7 @@ class GroupStudent(ClusterableModel):
     panels = [
         FieldPanel("first_name"),
         FieldPanel("last_name"),
+        PageChooserPanel("group", page_type="home.GroupPage"),
     ]
 
     def __str__(self):
@@ -81,8 +83,64 @@ class GroupStudent(ClusterableModel):
         verbose_name_plural = _("Студенты")
 
 
+class GroupTeacher(models.Model):
+    """Преподаватель группы: инлайн-объект со ссылкой (ForeignKey) на TeacherPage."""
+
+    group = ParentalKey(
+        "home.GroupPage",
+        verbose_name=_("Группа"),
+        on_delete=models.CASCADE,
+        related_name="group_teachers",
+    )
+    teacher = models.ForeignKey(
+        "home.TeacherPage",
+        verbose_name=_("Преподаватель"),
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+
+    panels = [
+        PageChooserPanel("teacher", page_type="home.TeacherPage"),
+    ]
+
+    def __str__(self):
+        return str(self.teacher)
+
+    class Meta:
+        verbose_name = _("Преподаватель группы")
+        verbose_name_plural = _("Преподаватели группы")
+
+
+class GroupSubject(models.Model):
+    """Предмет группы: инлайн-объект со ссылкой (ForeignKey) на SubjectPage."""
+
+    group = ParentalKey(
+        "home.GroupPage",
+        verbose_name=_("Группа"),
+        on_delete=models.CASCADE,
+        related_name="group_subjects",
+    )
+    subject = models.ForeignKey(
+        "home.SubjectPage",
+        verbose_name=_("Предмет"),
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+
+    panels = [
+        PageChooserPanel("subject", page_type="home.SubjectPage"),
+    ]
+
+    def __str__(self):
+        return str(self.subject)
+
+    class Meta:
+        verbose_name = _("Предмет группы")
+        verbose_name_plural = _("Предметы группы")
+
+
 class GroupPage(Page):
-    """Учебная группа (страница-справочник) с куратором и студентами."""
+    """Учебная группа (страница-справочник): куратор, преподаватели и предметы."""
 
     curator_name = models.CharField(_("Имя куратора"), max_length=100, blank=True)
     curator_email = models.EmailField(_("Email куратора"), blank=True)
@@ -100,7 +158,8 @@ class GroupPage(Page):
             ],
             _("Куратор"),
         ),
-        InlinePanel("students", label=_("Студенты")),
+        InlinePanel("group_teachers", label=_("Преподаватели")),
+        InlinePanel("group_subjects", label=_("Предметы")),
     ]
 
     def __str__(self):

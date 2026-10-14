@@ -1,10 +1,21 @@
 """Тесты страниц приложения home."""
 from datetime import date, time
 
+from django.test import TestCase
 from wagtail.models import Page, Site
+from wagtail.snippets.models import get_snippet_models
 from wagtail.test.utils import WagtailPageTestCase
 
-from home.models import GroupPage, HomePage, SchedulePage, SubjectPage, TeacherPage
+from home.models import (
+    GroupPage,
+    GroupStudent,
+    GroupSubject,
+    GroupTeacher,
+    HomePage,
+    SchedulePage,
+    SubjectPage,
+    TeacherPage,
+)
 
 
 class SchedulePageTests(WagtailPageTestCase):
@@ -114,6 +125,68 @@ class SchedulePageTests(WagtailPageTestCase):
         self.assertIn("Математика", html)
         self.assertIn("Иванов И.И.", html)
         self.assertIn("ауд. 222", html)
+
+
+class GroupRelationsTests(TestCase):
+    """Проверяем выбор преподавателей/предметов и студентов через ForeignKey."""
+
+    def setUp(self):
+        root_page = Page.get_first_root_node()
+        self.homepage = HomePage(title="Home")
+        root_page.add_child(instance=self.homepage)
+
+        self.subject = SubjectPage(title="Математика")
+        self.homepage.add_child(instance=self.subject)
+        self.subject2 = SubjectPage(title="Физика")
+        self.homepage.add_child(instance=self.subject2)
+
+        self.teacher = TeacherPage(title="Иванов И.И.")
+        self.homepage.add_child(instance=self.teacher)
+        self.teacher2 = TeacherPage(title="Петров П.П.")
+        self.homepage.add_child(instance=self.teacher2)
+
+        self.group = GroupPage(title="ПИ-20")
+        self.homepage.add_child(instance=self.group)
+
+    def test_student_has_foreign_key_to_group(self):
+        """Студент — отдельная модель со ForeignKey на группу."""
+        student = GroupStudent.objects.create(
+            group=self.group, first_name="Иван", last_name="Сидоров"
+        )
+        self.assertEqual(student.group, self.group)
+        self.assertIn(student, self.group.students.all())
+
+    def test_group_teachers_selected_via_foreign_key(self):
+        """Преподаватели группы выбираются через ForeignKey на TeacherPage."""
+        GroupTeacher.objects.create(group=self.group, teacher=self.teacher)
+        GroupTeacher.objects.create(group=self.group, teacher=self.teacher2)
+
+        chosen = [link.teacher for link in self.group.group_teachers.all()]
+        self.assertEqual(chosen, [self.teacher, self.teacher2])
+
+    def test_group_subjects_selected_via_foreign_key(self):
+        """Предметы группы выбираются через ForeignKey на SubjectPage."""
+        GroupSubject.objects.create(group=self.group, subject=self.subject)
+        GroupSubject.objects.create(group=self.group, subject=self.subject2)
+
+        chosen = [link.subject for link in self.group.group_subjects.all()]
+        self.assertEqual(chosen, [self.subject, self.subject2])
+
+    def test_deleting_group_cascades_to_relations(self):
+        """Удаление группы каскадно удаляет связанных студентов/связи."""
+        GroupStudent.objects.create(group=self.group, first_name="Иван", last_name="Сидоров")
+        GroupTeacher.objects.create(group=self.group, teacher=self.teacher)
+        GroupSubject.objects.create(group=self.group, subject=self.subject)
+
+        self.group.delete()
+
+        self.assertFalse(GroupStudent.objects.exists())
+        self.assertFalse(GroupTeacher.objects.exists())
+        self.assertFalse(GroupSubject.objects.exists())
+
+    def test_group_student_registered_as_snippet(self):
+        """Студент доступен как сниппет для создания через ForeignKey."""
+        self.assertIn(GroupStudent, get_snippet_models())
 
 
 class HomeSetUpTests(WagtailPageTestCase):
