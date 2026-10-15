@@ -1,12 +1,18 @@
 <div class="sch-grid" id="sch-cards">
   {% for card in group_cards %}
     {% with group=card.group %}
-    <section class="sch-card" data-group="{{ group.pk }}">
+    <section class="sch-card" data-group="{{ group.pk }}" data-curator="{{ group.curator_id|default:'' }}">
       <h2 class="sch-card-title">
         {{ group.name }}
         <span class="sch-badge-count">{{ card.lessons|length }} зан.</span>
       </h2>
-      <p class="sch-curator">Куратор: <b>{{ group.curator_name }}</b></p>
+      <p class="sch-curator">
+        {% if group.curator %}
+          Куратор: <b>{{ group.curator.name }}</b>{% if group.curator.phone %} <span class="sch-curator-phone">{{ group.curator.phone }}</span>{% endif %}
+        {% else %}
+          <span class="sch-empty">Куратор не назначен</span>
+        {% endif %}
+      </p>
 
       {% if card.students %}
         <div class="sch-students">
@@ -50,6 +56,7 @@
       {% else %}
         <p class="sch-empty">Занятий нет.</p>
       {% endif %}
+      <p class="sch-card-hint">Клик по группе — подробнее</p>
     </section>
     {% endwith %}
   {% empty %}

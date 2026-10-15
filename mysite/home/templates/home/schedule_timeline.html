@@ -1,7 +1,7 @@
 <div class="sch-timeline hidden" id="sch-timeline">
   <div class="sch-wk-legend">
     {% for group in schedule_groups %}
-      <span class="sch-wk-legend-item">
+      <span class="sch-wk-legend-item" data-group="{{ group.pk }}">
         <span class="sch-wk-dot {% cycle 'sch-wk-g0' 'sch-wk-g1' 'sch-wk-g2' 'sch-wk-g3' 'sch-wk-g4' 'sch-wk-g5' 'sch-wk-g6' 'sch-wk-g7' %}"></span>
         {{ group.name }}
       </span>
@@ -12,10 +12,10 @@
     <div class="sch-wk" id="sch-week">
       <div class="sch-wk-head">
         <div class="sch-wk-corner"></div>
-        {% for day in days %}
-          <div class="sch-wk-head-day" data-day="{{ day.date_iso }}" data-weekday="{{ day.weekday_key }}">
-            <span class="sch-wk-head-date">{{ day.date|date:"d.m" }}</span>
-            <span class="sch-wk-head-wd">{{ day.weekday_label }}</span>
+        {% for column in weekday_columns %}
+          <div class="sch-wk-head-day" data-weekday="{{ column.key }}">
+            <span class="sch-wk-head-date">{{ column.date|date:"d.m" }}</span>
+            <span class="sch-wk-head-wd">{{ column.label }}</span>
           </div>
         {% endfor %}
       </div>
@@ -23,9 +23,9 @@
         <div class="sch-wk-hours">
           {% for h in hours %}<div class="sch-wk-hour"><span>{{ h }}:00</span></div>{% endfor %}
         </div>
-        {% for day in days %}
-          <div class="sch-wk-day" data-day="{{ day.date_iso }}" data-weekday="{{ day.weekday_key }}">
-            {% for lesson in day.lessons %}
+        {% for column in weekday_columns %}
+          <div class="sch-wk-day" data-weekday="{{ column.key }}">
+            {% for lesson in column.lessons %}
               <div class="sch-wk-block sch-wk-g{{ lesson.color }}"
                    data-groups="{{ lesson.group_pks }}"
                    data-weekday="{{ lesson.weekday_key }}"
@@ -45,5 +45,5 @@
       </div>
     </div>
   </div>
-  <p class="sch-wk-note">Столбцы — даты расписания. Цвет блока — первая группа занятия; если занятия совпадают по времени, они выстраиваются рядом внутри дня.</p>
+  <p class="sch-wk-note">Неделя с понедельника по пятницу: даты в шапке меняются вместе с выбором недели. Цвет блока — первая группа занятия; если занятия совпадают по времени, они выстраиваются рядом внутри дня.</p>
 </div>

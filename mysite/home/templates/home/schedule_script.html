@@ -1,8 +1,11 @@
 <script>
 (function () {
-  var groupRow = document.getElementById('sch-group-row');
+  var curatorRow = document.getElementById('sch-curator-row');
+  var groupList = document.getElementById('sch-group-list');
+  var groupAll = document.getElementById('sch-group-all');
+  var groupEmpty = document.getElementById('sch-group-empty');
   var weekdayRow = document.getElementById('sch-weekday-row');
-  var dateInput = document.getElementById('sch-date');
+  var weekSelect = document.getElementById('sch-week-select');
   var hourFrom = document.getElementById('sch-hour-from');
   var hourTo = document.getElementById('sch-hour-to');
   var resetBtn = document.getElementById('sch-reset');
@@ -12,15 +15,20 @@
   var dayCols = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-day')) : [];
   var dayHeaders = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-head-day')) : [];
   var weekBlocks = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-block')) : [];
+  var legendItems = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-legend-item')) : [];
   var viewTableBtn = document.getElementById('sch-view-table');
   var viewTimelineBtn = document.getElementById('sch-view-timeline');
   var nothing = document.getElementById('sch-nothing');
+  var modal = document.getElementById('sch-group-modal');
+  var modalBody = document.getElementById('sch-group-modal-body');
 
   var MIN_HOUR = 6, MAX_HOUR = 23, HOUR_PX = 56; // должно совпадать с --hour-h и range(6, 23) в модели
-  var state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '', view: 'table' };
+  var WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  var state = { curator: 'all', weekday: 'all', weekStart: '', weekEnd: '', hourFrom: '', hourTo: '', view: 'table' };
+  var groupMeta = {}; // pk группы -> { curator, label, check, enabled }
   var weekBuilt = false;
 
-  /* Локальная дата в формате YYYY-MM-DD (совпадает с data-day/data-date из Django). */
+  /* Локальная дата в формате YYYY-MM-DD (совпадает с data-date из Django). */
   function isoDate(d) {
     var month = String(d.getMonth() + 1).padStart(2, '0');
     var day = String(d.getDate()).padStart(2, '0');
@@ -36,6 +44,28 @@
     var p = hhmm.split(':');
     return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
   }
+
+  /* Все группы есть в DOM всегда (даже скрытые фильтром куратора). */
+  if (groupList) {
+    groupList.querySelectorAll('.sch-check[data-group]').forEach(function (label) {
+      var check = label.querySelector('input[type="checkbox"]');
+      groupMeta[label.dataset.group] = {
+        curator: label.dataset.curator || '',
+        label: label,
+        check: check,
+        enabled: !!(check && check.checked)
+      };
+    });
+  }
+
+  /* Текущая неделя (пн–пт) выбрана в select на сервере. */
+  function readWeekFromSelect() {
+    if (!weekSelect) return;
+    var option = weekSelect.options[weekSelect.selectedIndex];
+    state.weekStart = weekSelect.value;
+    state.weekEnd = option ? option.dataset.end : '';
+  }
+  readWeekFromSelect();
 
   /* Пересечение промежутка [from, to) с промежутком занятия [start, end) */
   function intervalMatches(startMin, endMin) {
@@ -53,15 +83,43 @@
     return { start: start, end: end };
   }
 
-  /* Фильтр по дню недели и дате (у каждого занятия есть конкретная дата). */
+  /* Фильтр по дню недели (у каждого занятия есть конкретная дата). */
   function weekdayMatches(el) {
     if (state.weekday === 'all') return true;
     return el.dataset.weekday === state.weekday;
   }
 
+  /* Дата внутри выбранной недели (пн–пт, сравнение ISO-строк). */
   function dateMatches(el) {
-    if (!state.date) return true;
-    return el.dataset.date === state.date;
+    if (!state.weekStart) return true;
+    var iso = el.dataset.date;
+    return iso >= state.weekStart && iso <= state.weekEnd;
+  }
+
+  /* Группа относится к выбранному куратору (или куратор не выбран). */
+  function inCuratorScope(pk) {
+    if (state.curator === 'all') return true;
+    var meta = groupMeta[pk];
+    return !!meta && meta.curator === state.curator;
+  }
+
+  /* Занятие активно: есть хотя бы одна его группа выбранного куратора,
+     и у этой группы не снята галочка в списке групп. */
+  function lessonGroupsOk(el) {
+    var pks = el.dataset.groups ? el.dataset.groups.split(',') : [];
+    for (var i = 0; i < pks.length; i++) {
+      var meta = groupMeta[pks[i]];
+      if (meta && meta.enabled && inCuratorScope(pks[i])) return true;
+    }
+    return false;
+  }
+
+  function cardGroupOk(card) {
+    var meta = groupMeta[card.dataset.group];
+    var enabled = meta ? meta.enabled : true;
+    var curator = meta ? meta.curator : (card.dataset.curator || '');
+    if (!enabled) return false;
+    return state.curator === 'all' || curator === state.curator;
   }
 
   function rowMatches(tr) {
@@ -72,13 +130,46 @@
 
   function blockMatches(el) {
     if (!weekdayMatches(el) || !dateMatches(el)) return false;
-    if (state.group !== 'all') {
-      var pks = el.dataset.groups ? el.dataset.groups.split(',') : [];
-      if (pks.indexOf(state.group) === -1) return false;
-    }
+    if (!lessonGroupsOk(el)) return false;
     var t = lessonTime(el);
     if (!t) return false;
     return intervalMatches(t.start, t.end);
+  }
+
+  /* Показ/скрытие пунктов списка групп по выбранному куратору.
+     Отключённые группы не исчезают — остаются в списке неактивными. */
+  function refreshGroupList() {
+    var visible = 0;
+    Object.keys(groupMeta).forEach(function (pk) {
+      var meta = groupMeta[pk];
+      var show = state.curator === 'all' || meta.curator === state.curator;
+      meta.label.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+    if (groupEmpty) groupEmpty.classList.toggle('hidden', visible > 0);
+    syncGroupAll();
+  }
+
+  /* Мастер-галочка «Все группы» отражает состояние групп в области видимости. */
+  function syncGroupAll() {
+    if (!groupAll) return;
+    var any = false, all = true;
+    Object.keys(groupMeta).forEach(function (pk) {
+      var meta = groupMeta[pk];
+      if (meta.label.classList.contains('hidden')) return;
+      any = true;
+      if (!meta.enabled) all = false;
+    });
+    groupAll.checked = any && all;
+  }
+
+  function updateBadges() {
+    cards.forEach(function (card) {
+      var badge = card.querySelector('.sch-badge-count');
+      if (!badge) return;
+      var rows = card.querySelectorAll('tbody tr:not(.hidden)');
+      badge.textContent = rows.length + ' зан.';
+    });
   }
 
   function apply() {
@@ -87,7 +178,7 @@
     var weekHasVisible = false;
 
     cards.forEach(function (card) {
-      var groupOk = (state.group === 'all' || card.dataset.group === state.group);
+      var groupOk = cardGroupOk(card);
       var anyVisible = false;
       if (groupOk) {
         var rows = Array.prototype.slice.call(card.querySelectorAll('tbody tr'));
@@ -99,9 +190,9 @@
         if (rows.length === 0) anyVisible = true;
       }
       card.classList.toggle('hidden', !(view === 'table' && groupOk && anyVisible));
-      card.classList.toggle('selected', groupOk && state.group !== 'all');
       if (view === 'table' && groupOk && anyVisible) visibleCards++;
     });
+    updateBadges();
 
     weekBlocks.forEach(function (el) {
       var ok = blockMatches(el);
@@ -109,10 +200,15 @@
       if (ok) weekHasVisible = true;
     });
     dayCols.forEach(function (col) {
-      col.classList.toggle('dim', state.weekday !== 'all' && col.dataset.day !== state.weekday);
+      col.classList.toggle('dim', state.weekday !== 'all' && col.dataset.weekday !== state.weekday);
     });
     dayHeaders.forEach(function (h) {
-      h.classList.toggle('dim', state.weekday !== 'all' && h.dataset.day !== state.weekday);
+      h.classList.toggle('dim', state.weekday !== 'all' && h.dataset.weekday !== state.weekday);
+    });
+    legendItems.forEach(function (item) {
+      var meta = groupMeta[item.dataset.group];
+      var active = !!meta && meta.enabled && (state.curator === 'all' || meta.curator === state.curator);
+      item.classList.toggle('inactive', !active);
     });
     if (view === 'week') layoutLanes();
 
@@ -121,31 +217,67 @@
     nothing.classList.toggle('hidden', visible !== 0);
   }
 
-  /* Первичная разметка сетки: позиции блоков по времени + линия «сейчас» */
-  function positionWeek() {
-    if (weekBuilt || !weekRoot) return;
-    weekBuilt = true;
-    weekBlocks.forEach(function (el) {
-      var t = lessonTime(el);
-      if (!t) { el.classList.add('hidden'); return; }
-      el.dataset.endMin = String(t.end);
-      el.style.top = (((t.start - MIN_HOUR * 60) / 60) * HOUR_PX) + 'px';
-      el.style.height = Math.max(((t.end - t.start) / 60 * HOUR_PX) - 4, 18) + 'px';
+  /* Даты в шапке таймлайна = выбранная неделя (пн–пт), + метка «сегодня». */
+  function updateWeekHeaders() {
+    if (!state.weekStart) return;
+    var parts = state.weekStart.split('-');
+    var monday = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    var todayKey = isoDate(new Date());
+    function dateFor(index) {
+      return new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + index);
+    }
+    dayHeaders.forEach(function (h) {
+      var index = WEEKDAY_KEYS.indexOf(h.dataset.weekday);
+      if (index < 0 || index > 4) return;
+      var d = dateFor(index);
+      var span = h.querySelector('.sch-wk-head-date');
+      if (span) {
+        span.textContent = String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
+      }
+      h.classList.toggle('today', isoDate(d) === todayKey);
     });
+    dayCols.forEach(function (col) {
+      var index = WEEKDAY_KEYS.indexOf(col.dataset.weekday);
+      if (index < 0 || index > 4) return;
+      col.classList.toggle('today', isoDate(dateFor(index)) === todayKey);
+    });
+    updateNowLine();
+  }
+
+  /* Линия «сейчас» — только если сегодня попадает в выбранную неделю. */
+  function updateNowLine() {
+    if (!timeline) return;
+    var existing = timeline.querySelector('.sch-wk-now');
+    if (existing) existing.parentNode.removeChild(existing);
+    if (!state.weekStart) return;
     var now = new Date();
     var todayKey = isoDate(now);
+    if (todayKey < state.weekStart || todayKey > state.weekEnd) return;
     var nowMin = now.getHours() * 60 + now.getMinutes();
-    dayHeaders.forEach(function (h) { h.classList.toggle('today', h.dataset.day === todayKey); });
-    dayCols.forEach(function (col) { col.classList.toggle('today', col.dataset.day === todayKey); });
-    if (nowMin >= MIN_HOUR * 60 && nowMin <= MAX_HOUR * 60) {
-      var col = timeline.querySelector('.sch-wk-day[data-day="' + todayKey + '"]');
-      if (col) {
-        var line = document.createElement('div');
-        line.className = 'sch-wk-now';
-        line.style.top = (((nowMin - MIN_HOUR * 60) / 60) * HOUR_PX) + 'px';
-        col.appendChild(line);
-      }
+    if (nowMin < MIN_HOUR * 60 || nowMin > MAX_HOUR * 60) return;
+    var wd = WEEKDAY_KEYS[(now.getDay() + 6) % 7];
+    var col = timeline.querySelector('.sch-wk-day[data-weekday="' + wd + '"]');
+    if (!col) return;
+    var line = document.createElement('div');
+    line.className = 'sch-wk-now';
+    line.style.top = (((nowMin - MIN_HOUR * 60) / 60) * HOUR_PX) + 'px';
+    col.appendChild(line);
+  }
+
+  /* Первичная разметка сетки: позиции блоков по времени + даты в шапке */
+  function positionWeek() {
+    if (!weekRoot) return;
+    if (!weekBuilt) {
+      weekBuilt = true;
+      weekBlocks.forEach(function (el) {
+        var t = lessonTime(el);
+        if (!t) { el.classList.add('hidden'); return; }
+        el.dataset.endMin = String(t.end);
+        el.style.top = (((t.start - MIN_HOUR * 60) / 60) * HOUR_PX) + 'px';
+        el.style.height = Math.max(((t.end - t.start) / 60 * HOUR_PX) - 4, 18) + 'px';
+      });
     }
+    updateWeekHeaders();
   }
 
   /* Раскладка занятий дня по «дорожкам», если они пересекаются по времени */
@@ -190,14 +322,92 @@
     apply();
   }
 
-  viewTableBtn.addEventListener('click', function () { setView('table'); });
-  viewTimelineBtn.addEventListener('click', function () { setView('week'); });
+  /* ---- Модальное окно группы (клик по карточке/названию в списке) ---- */
+  function openModal(pk) {
+    if (!modal || !modalBody) return;
+    var card = document.querySelector('#sch-cards > .sch-card[data-group="' + pk + '"]');
+    modalBody.innerHTML = '';
+    if (card) {
+      var clone = card.cloneNode(true);
+      clone.classList.remove('hidden');
+      clone.classList.remove('selected');
+      modalBody.appendChild(clone);
+    }
+    modal.classList.remove('hidden');
+    document.body.classList.add('sch-modal-open');
+  }
 
-  groupRow.addEventListener('click', function (e) {
+  function closeModal() {
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('sch-modal-open');
+  }
+
+  if (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target.closest('[data-modal-close]')) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeModal();
+    });
+  }
+
+  /* Клик по названию группы в списке фильтра открывает модалку;
+     клик непосредственно по флажку только переключает активность. */
+  if (groupList) {
+    groupList.addEventListener('click', function (e) {
+      var label = e.target.closest('.sch-check[data-group]');
+      if (!label) return;
+      if (e.target.closest('input')) return;
+      e.preventDefault();
+      openModal(label.dataset.group);
+    });
+
+    groupList.addEventListener('change', function (e) {
+      var input = e.target;
+      if (!input || input.type !== 'checkbox') return;
+      var label = input.closest('.sch-check[data-group]');
+      if (!label) return;
+      var meta = groupMeta[label.dataset.group];
+      if (!meta) return;
+      meta.enabled = input.checked;
+      label.classList.toggle('inactive', !meta.enabled);
+      syncGroupAll();
+      apply();
+    });
+  }
+
+  if (groupAll) {
+    groupAll.addEventListener('change', function () {
+      var checked = groupAll.checked;
+      Object.keys(groupMeta).forEach(function (pk) {
+        var meta = groupMeta[pk];
+        if (meta.label.classList.contains('hidden')) return;
+        meta.enabled = checked;
+        meta.check.checked = checked;
+        meta.label.classList.toggle('inactive', !checked);
+      });
+      apply();
+    });
+  }
+
+  /* Клик по карточке группы — модальное окно с деталями. */
+  cards.forEach(function (card) {
+    card.addEventListener('click', function () { openModal(card.dataset.group); });
+  });
+
+  if (viewTableBtn && viewTimelineBtn) {
+    viewTableBtn.addEventListener('click', function () { setView('table'); });
+    viewTimelineBtn.addEventListener('click', function () { setView('week'); });
+  }
+
+  /* Сначала куратор — затем видны его группы и занятия. */
+  curatorRow.addEventListener('click', function (e) {
     var chip = e.target.closest('.chip');
     if (!chip) return;
-    setChipActive(groupRow, chip);
-    state.group = chip.dataset.group;
+    setChipActive(curatorRow, chip);
+    state.curator = chip.dataset.curator;
+    refreshGroupList();
     apply();
   });
 
@@ -209,16 +419,46 @@
     apply();
   });
 
-  dateInput.addEventListener('change', function () { state.date = dateInput.value; apply(); });
+  if (weekSelect) {
+    weekSelect.addEventListener('change', function () {
+      readWeekFromSelect();
+      positionWeek(); // новые даты в шапке недельного таймлайна
+      apply();
+    });
+  }
+
   hourFrom.addEventListener('change', function () { state.hourFrom = hourFrom.value; apply(); });
   hourTo.addEventListener('change', function () { state.hourTo = hourTo.value; apply(); });
 
   resetBtn.addEventListener('click', function () {
-    state = { group: 'all', weekday: 'all', date: '', hourFrom: '', hourTo: '', view: state.view };
-    dateInput.value = ''; hourFrom.value = ''; hourTo.value = '';
-    setChipActive(groupRow, groupRow.querySelector('[data-group="all"]'));
+    state.curator = 'all';
+    state.weekday = 'all';
+    state.hourFrom = '';
+    state.hourTo = '';
+    hourFrom.value = ''; hourTo.value = '';
+    setChipActive(curatorRow, curatorRow.querySelector('[data-curator="all"]'));
     setChipActive(weekdayRow, weekdayRow.querySelector('[data-weekday="all"]'));
+    // все группы снова включены и видны
+    Object.keys(groupMeta).forEach(function (pk) {
+      var meta = groupMeta[pk];
+      meta.enabled = true;
+      meta.check.checked = true;
+      meta.label.classList.remove('inactive');
+    });
+    refreshGroupList();
+    // текущая неделя
+    var current = weekSelect ? weekSelect.querySelector('option[data-current="1"]') : null;
+    if (current) {
+      weekSelect.value = current.value;
+      readWeekFromSelect();
+      positionWeek();
+    }
     apply();
   });
+
+  /* Первичная синхронизация: видимость групп + фильтры по текущей неделе. */
+  refreshGroupList();
+  updateWeekHeaders();
+  apply();
 })();
 </script>

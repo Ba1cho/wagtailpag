@@ -1,10 +1,26 @@
 <div class="sch-filters" id="sch-filters">
+  <div class="sch-filter-row" id="sch-curator-row">
+    <span class="sch-filter-label">Куратор</span>
+    <button class="chip active" data-curator="all">Все кураторы</button>
+    {% for curator in curators %}
+      <button class="chip" data-curator="{{ curator.pk }}">{{ curator.name }}</button>
+    {% endfor %}
+  </div>
   <div class="sch-filter-row" id="sch-group-row">
     <span class="sch-filter-label">Группы</span>
-    <button class="chip active" data-group="all">Все группы</button>
-    {% for group in schedule_groups %}
-      <button class="chip" data-group="{{ group.pk }}">{{ group.name }}</button>
-    {% endfor %}
+    <label class="sch-check sch-check-master">
+      <input type="checkbox" id="sch-group-all" checked>
+      <span class="sch-check-name">Все группы</span>
+    </label>
+    <div class="sch-group-checks" id="sch-group-list">
+      {% for group in schedule_groups %}
+        <label class="sch-check" data-group="{{ group.pk }}" data-curator="{{ group.curator_id|default:'' }}">
+          <input type="checkbox" checked>
+          <span class="sch-check-name">{{ group.name }}</span>
+        </label>
+      {% endfor %}
+      <span class="sch-check-empty hidden" id="sch-group-empty">У этого куратора пока нет групп.</span>
+    </div>
   </div>
   <div class="sch-filter-row" id="sch-weekday-row">
     <span class="sch-filter-label">День недели</span>
@@ -14,8 +30,13 @@
     {% endfor %}
   </div>
   <div class="sch-filter-row">
-    <span class="sch-filter-label">Дата</span>
-    <input type="date" class="chip-input" id="sch-date">
+    <span class="sch-filter-label">Неделя (пн–пт)</span>
+    <select class="chip-input" id="sch-week-select">
+      {% for week in schedule_weeks %}
+        <option value="{{ week.start_iso }}" data-end="{{ week.end_iso }}"{% if week.is_current %} selected data-current="1"{% endif %}>{{ week.label }}</option>
+      {% endfor %}
+    </select>
+    <button type="button" class="sch-reset" id="sch-reset">Сбросить фильтры</button>
   </div>
   <div class="sch-filter-row">
     <span class="sch-filter-label">Часы</span>
@@ -29,6 +50,5 @@
       <option value="">—</option>
       {% for h in hours %}<option value="{{ h }}">{{ h }}:00</option>{% endfor %}
     </select>
-    <button type="button" class="sch-reset" id="sch-reset">Сбросить фильтры</button>
   </div>
 </div>

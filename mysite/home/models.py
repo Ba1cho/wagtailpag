@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -5,7 +7,7 @@ from modelcluster.fields import ParentalKey
 from modelcluster.models import ClusterableModel
 
 from wagtail import blocks
-from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.admin.viewsets.chooser import ChooserViewSet
 from wagtail.fields import StreamField
 from wagtail.models import Orderable, Page
@@ -175,6 +177,49 @@ class TeacherPage(Page):
         verbose_name_plural = _("Преподаватели")
 
 
+class CuratorModel(Orderable):
+    """Куратор (инлайн-объект страницы-справочника кураторов)."""
+
+    curator_page = ParentalKey(
+        "home.CuratorPage",
+        verbose_name=_("Страница кураторов"),
+        on_delete=models.CASCADE,
+        related_name="curators",
+    )
+    name = models.CharField(_("ФИО"), max_length=200)
+    phone = models.CharField(_("Номер телефона"), max_length=30, blank=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("phone"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = _("Куратор")
+        verbose_name_plural = _("Кураторы")
+
+
+class CuratorPage(Page):
+    """Страница-справочник со списком кураторов (заполняется инлайном)."""
+
+    parent_page_types = ["home.HomePage"]
+    subpage_types = []
+
+    content_panels = Page.content_panels + [
+        InlinePanel("curators", label=_("Кураторы")),
+    ]
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        verbose_name = _("Кураторы")
+        verbose_name_plural = _("Кураторы")
+
+
 class GroupStudent(ClusterableModel):
     """Студент, принадлежащий группе GroupModel (инлайн-объект)."""
 
@@ -210,20 +255,18 @@ class GroupModel(Orderable, ClusterableModel):
         related_name="groups",
     )
     name = models.CharField(_("Название"), max_length=200)
-    curator_name = models.CharField(_("Имя куратора"), max_length=100, blank=True)
-    curator_email = models.EmailField(_("Email куратора"), blank=True)
-    curator_phone = models.CharField(_("Телефон куратора"), max_length=30, blank=True)
+    curator = models.ForeignKey(
+        "home.CuratorModel",
+        verbose_name=_("Куратор"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="groups",
+    )
 
     panels = [
         FieldPanel("name"),
-        MultiFieldPanel(
-            [
-                FieldPanel("curator_name"),
-                FieldPanel("curator_email"),
-                FieldPanel("curator_phone"),
-            ],
-            _("Куратор"),
-        ),
+        FieldPanel("curator"),
         InlinePanel("students", label=_("Студенты")),
     ]
 
@@ -330,12 +373,72 @@ class SchedulePage(Page):
     # те же ключи, что и в data-атрибутах шаблонов/JS (mon = понедельник)
     WEEKDAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
+    # родительный падеж месяцев для подписей недель («12–16 октября 2026»)
+    RU_MONTHS = (
+        "января",
+        "февраля",
+        "марта",
+        "апреля",
+        "мая",
+        "июня",
+        "июля",
+        "августа",
+        "сентября",
+        "октября",
+        "ноября",
+        "декабря",
+    )
+
+    @classmethod
+    def build_weeks(cls):
+        """Периодичный фильтр дат: недели пн–пт текущего и следующего года.
+
+        Каждая неделя — с понедельника по пятницу, например
+        «12–16 октября 2026» (12–16, 19–23, 26–30 октября и т.д.).
+        """
+        today = date.today()
+        year = today.year
+        first_monday = date(year, 1, 1)
+        first_monday -= timedelta(days=first_monday.weekday())
+        last_monday = date(year + 1, 12, 31)
+        last_monday -= timedelta(days=last_monday.weekday())
+
+        weeks = []
+        monday = first_monday
+        while monday <= last_monday:
+            friday = monday + timedelta(days=4)
+            if monday.month == friday.month:
+                label = (
+                    f"{monday.day}–{friday.day} "
+                    f"{cls.RU_MONTHS[friday.month - 1]} {friday.year}"
+                )
+            else:
+                label = (
+                    f"{monday.day} {cls.RU_MONTHS[monday.month - 1]} – "
+                    f"{friday.day} {cls.RU_MONTHS[friday.month - 1]} {friday.year}"
+                )
+            weeks.append(
+                {
+                    "start_iso": monday.isoformat(),
+                    "end_iso": friday.isoformat(),
+                    "label": label,
+                    "is_current": monday <= today <= friday,
+                }
+            )
+            monday += timedelta(days=7)
+        return weeks
+
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
 
-        # Группы для чипов фильтра (все группы из справочника GroupModel).
-        schedule_groups = list(GroupModel.objects.order_by("name"))
+        # Группы для фильтра (все группы из справочника GroupModel) и кураторы:
+        # сначала выбирается куратор, затем видны его группы и занятия.
+        schedule_groups = list(
+            GroupModel.objects.select_related("curator").order_by("name")
+        )
         context["schedule_groups"] = schedule_groups
+        context["curators"] = list(CuratorModel.objects.order_by("name"))
+        context["schedule_weeks"] = self.build_weeks()
         context["hours"] = range(6, 23)
 
         # Список дней недели для фильтра: (ключ, подпись).
@@ -347,13 +450,26 @@ class SchedulePage(Page):
             for index, group in enumerate(schedule_groups)
         }
 
-        # Дни расписания: отсортированы по дате, занятия внутри — по времени начала.
-        days = []
+        # Недельный таймлайн: пять колонок пн–пт. Даты в шапке подставляет JS
+        # по выбранной неделе, занятия группируются по дню недели.
+        today = date.today()
+        week_monday = today - timedelta(days=today.weekday())
+        weekday_columns = [
+            {
+                "key": self.WEEKDAY_KEYS[index],
+                "label": self.RU_WEEKDAYS[index],
+                "date": week_monday + timedelta(days=index),
+                "lessons": [],
+            }
+            for index in range(5)
+        ]
+
+        # Занятия: общий список для карточек + колонки таймлайна по дням недели.
         lessons_by_group = {group.pk: [] for group in schedule_groups}
         for day_block in self.schedule:
             if day_block.block_type != "day" or not day_block.value["date"]:
                 continue
-            date = day_block.value["date"]
+            day_date = day_block.value["date"]
             lessons = []
             for lesson_block in day_block.value["lessons"]:
                 if lesson_block.block_type != "lesson":
@@ -378,26 +494,23 @@ class SchedulePage(Page):
                         if lesson_groups
                         else self.WEEK_TIMELINE_COLORS - 1
                     ),
-                    "date": date,
-                    "date_iso": date.isoformat(),
-                    "weekday_key": self.WEEKDAY_KEYS[date.weekday()],
-                    "weekday_label": self.RU_WEEKDAYS[date.weekday()],
+                    "date": day_date,
+                    "date_iso": day_date.isoformat(),
+                    "weekday_key": self.WEEKDAY_KEYS[day_date.weekday()],
+                    "weekday_label": self.RU_WEEKDAYS[day_date.weekday()],
                 }
                 lessons.append(lesson)
                 for group in lesson_groups:
                     lessons_by_group.setdefault(group.pk, []).append(lesson)
             lessons.sort(key=lambda lesson: (lesson["start"], lesson["end"]))
-            days.append(
-                {
-                    "date": date,
-                    "date_iso": date.isoformat(),
-                    "weekday_key": self.WEEKDAY_KEYS[date.weekday()],
-                    "weekday_label": self.RU_WEEKDAYS[date.weekday()],
-                    "lessons": lessons,
-                }
+            # Только пн–пт попадает в недельный таймлайн (выходные не показываем).
+            if day_date.weekday() < 5:
+                weekday_columns[day_date.weekday()]["lessons"].extend(lessons)
+        for column in weekday_columns:
+            column["lessons"].sort(
+                key=lambda lesson: (lesson["date"], lesson["start"], lesson["end"])
             )
-        days.sort(key=lambda day: day["date"])
-        context["days"] = days
+        context["weekday_columns"] = weekday_columns
 
         # Карточки групп: заголовок, куратор, студенты и занятия группы.
         context["group_cards"] = [

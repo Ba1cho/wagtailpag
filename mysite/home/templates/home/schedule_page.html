@@ -90,6 +90,37 @@
   .sch-wk-g5 { background:#cffafe; border-color:#0891b2; color:#155e75; }
   .sch-wk-g6 { background:#ffedd5; border-color:#ea580c; color:#7c2d12; }
   .sch-wk-g7 { background:#e2e8f0; border-color:#475569; color:#1e293b; }
+
+  /* ---- Список групп (чекбоксы: снятие галочки делает группу неактивной,
+         но пункт остаётся в списке) ---- */
+  .sch-group-checks { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  .sch-check { display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--border); background:var(--card); color:var(--text); border-radius:999px; padding:.4rem .9rem; font-size:.9rem; cursor:pointer; transition:all .15s ease; user-select:none; }
+  .sch-check:hover { border-color:var(--accent); color:var(--accent); }
+  .sch-check input { accent-color:var(--accent); margin:0; cursor:pointer; }
+  .sch-check-master { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .sch-check.inactive { opacity:.45; background:var(--bg); text-decoration:line-through; }
+  .sch-check.inactive:hover { opacity:.8; }
+  .sch-check.hidden { display:none; }
+  .sch-check-empty { color:var(--muted); font-style:italic; font-size:.85rem; }
+  .sch-check-empty.hidden { display:none; }
+
+  /* ---- Карточка группы: клик открывает модальное окно ---- */
+  .sch-card { cursor:pointer; transition:border-color .15s ease, box-shadow .15s ease; }
+  .sch-card:hover { border-color:var(--accent); box-shadow:0 4px 14px rgba(0,0,0,.10); }
+  .sch-card-hint { margin:.75rem 0 0; font-size:.75rem; color:var(--muted); text-align:right; font-style:italic; }
+  .sch-curator-phone { color:var(--muted); font-size:.85rem; white-space:nowrap; }
+  .sch-wk-legend-item.inactive { opacity:.4; text-decoration:line-through; }
+
+  /* ---- Модальное окно группы ---- */
+  .sch-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:1.5rem; }
+  .sch-modal.hidden { display:none; }
+  .sch-modal-backdrop { position:absolute; inset:0; background:rgba(17,24,39,.55); }
+  .sch-modal-dialog { position:relative; z-index:1; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 20px 50px rgba(0,0,0,.3); width:min(720px,100%); max-height:85vh; overflow:auto; padding:1.5rem; }
+  .sch-modal-close { position:absolute; top:.6rem; right:.8rem; border:none; background:none; font-size:1.7rem; line-height:1; color:var(--muted); cursor:pointer; padding:.1rem .4rem; }
+  .sch-modal-close:hover { color:var(--accent); }
+  .sch-modal-body .sch-card { border:none; box-shadow:none; padding:0; cursor:default; }
+  .sch-modal-body .sch-card-hint { display:none; }
+  body.sch-modal-open { overflow:hidden; }
 </style>
 {% endblock extra_css %}
 
@@ -107,6 +138,15 @@
   {% include "home/schedule_timeline.html" %}
 
   <p class="sch-nothing hidden" id="sch-nothing">По выбранным фильтрам занятий не найдено.</p>
+</div>
+
+<!-- Модальное окно с деталями группы (открывается кликом по группе) -->
+<div class="sch-modal hidden" id="sch-group-modal" role="dialog" aria-modal="true">
+  <div class="sch-modal-backdrop" data-modal-close></div>
+  <div class="sch-modal-dialog">
+    <button type="button" class="sch-modal-close" data-modal-close aria-label="Закрыть">&times;</button>
+    <div class="sch-modal-body" id="sch-group-modal-body"></div>
+  </div>
 </div>
 
 {% include "home/schedule_script.html" %}
