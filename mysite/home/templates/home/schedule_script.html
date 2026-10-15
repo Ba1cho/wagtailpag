@@ -16,15 +16,13 @@
   var dayHeaders = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-head-day')) : [];
   var weekBlocks = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-block')) : [];
   var legendItems = timeline ? Array.prototype.slice.call(timeline.querySelectorAll('.sch-wk-legend-item')) : [];
-  var viewTableBtn = document.getElementById('sch-view-table');
-  var viewTimelineBtn = document.getElementById('sch-view-timeline');
   var nothing = document.getElementById('sch-nothing');
   var modal = document.getElementById('sch-group-modal');
   var modalBody = document.getElementById('sch-group-modal-body');
 
   var MIN_HOUR = 6, MAX_HOUR = 23, HOUR_PX = 56; // должно совпадать с --hour-h и range(6, 23) в модели
   var WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  var state = { curator: 'all', weekday: 'all', weekStart: '', weekEnd: '', hourFrom: '', hourTo: '', view: 'table' };
+  var state = { curator: 'all', weekday: 'all', weekStart: '', weekEnd: '', hourFrom: '', hourTo: '' };
   var groupMeta = {}; // pk группы -> { curator, label, check, enabled }
   var weekBuilt = false;
 
@@ -173,7 +171,6 @@
   }
 
   function apply() {
-    var view = state.view;
     var visibleCards = 0;
     var weekHasVisible = false;
 
@@ -189,8 +186,8 @@
         });
         if (rows.length === 0) anyVisible = true;
       }
-      card.classList.toggle('hidden', !(view === 'table' && groupOk && anyVisible));
-      if (view === 'table' && groupOk && anyVisible) visibleCards++;
+      card.classList.toggle('hidden', !(groupOk && anyVisible));
+      if (groupOk && anyVisible) visibleCards++;
     });
     updateBadges();
 
@@ -210,11 +207,10 @@
       var active = !!meta && meta.enabled && (state.curator === 'all' || meta.curator === state.curator);
       item.classList.toggle('inactive', !active);
     });
-    if (view === 'week') layoutLanes();
+    layoutLanes();
 
-    timeline.classList.toggle('hidden', view !== 'week');
-    var visible = view === 'table' ? visibleCards : (weekHasVisible ? 1 : 0);
-    nothing.classList.toggle('hidden', visible !== 0);
+    /* Сообщение «не найдено» — только если пусто и в карточках, и в таймлайне. */
+    nothing.classList.toggle('hidden', visibleCards > 0 || weekHasVisible);
   }
 
   /* Даты в шапке таймлайна = выбранная неделя (пн–пт), + метка «сегодня». */
@@ -315,13 +311,6 @@
     });
   }
 
-  function setView(view) {
-    state.view = view;
-    if (view === 'week') positionWeek();
-    setChipActive(viewTableBtn.parentElement, view === 'table' ? viewTableBtn : viewTimelineBtn);
-    apply();
-  }
-
   /* ---- Модальное окно группы (клик по карточке/названию в списке) ---- */
   function openModal(pk) {
     if (!modal || !modalBody) return;
@@ -396,11 +385,6 @@
     card.addEventListener('click', function () { openModal(card.dataset.group); });
   });
 
-  if (viewTableBtn && viewTimelineBtn) {
-    viewTableBtn.addEventListener('click', function () { setView('table'); });
-    viewTimelineBtn.addEventListener('click', function () { setView('week'); });
-  }
-
   /* Сначала куратор — затем видны его группы и занятия. */
   curatorRow.addEventListener('click', function (e) {
     var chip = e.target.closest('.chip');
@@ -456,8 +440,10 @@
     apply();
   });
 
-  /* Первичная синхронизация: видимость групп + фильтры по текущей неделе. */
+  /* Первичная синхронизация: видимость групп + фильтры по текущей неделе.
+     Таймлайн виден вместе с карточками — сразу раскладываем его сетку. */
   refreshGroupList();
+  positionWeek();
   updateWeekHeaders();
   apply();
 })();

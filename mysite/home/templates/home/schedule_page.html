@@ -42,8 +42,9 @@
   .sch-nothing.hidden { display:none; }
   @media (max-width:640px){ .sch-filter-label { min-width:100%; } }
 
-  /* ---- View toggle ---- */
-  .sch-view-toggle { display:inline-flex; gap:.35rem; margin-bottom:1.25rem; }
+  /* ---- Заголовки секций: карточки и таймлайн видны вместе на одной странице ---- */
+  .sch-section { font-size:1.3rem; font-weight:700; margin:2rem 0 1rem; }
+  .sch-section-first { margin-top:0; }
 
   /* ---- Week timeline (Пн–Пт, все группы на одной сетке) ---- */
   .sch-timeline.hidden { display:none; }
@@ -130,11 +131,9 @@
   <p class="sch-sub">Расписание занятий по датам и группам. Используйте фильтры ниже.</p>
 
   {% include "home/schedule_filters.html" %}
-  <div class="sch-view-toggle">
-    <button class="chip active" id="sch-view-table" type="button">Группы</button>
-    <button class="chip" id="sch-view-timeline" type="button">Таймлайн по датам</button>
-  </div>
+  <h2 class="sch-section sch-section-first">Группы</h2>
   {% include "home/schedule_cards.html" %}
+  <h2 class="sch-section">Таймлайн по датам</h2>
   {% include "home/schedule_timeline.html" %}
 
   <p class="sch-nothing hidden" id="sch-nothing">По выбранным фильтрам занятий не найдено.</p>
