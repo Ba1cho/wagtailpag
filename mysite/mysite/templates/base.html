@@ -26,6 +26,9 @@
         {# Global stylesheets #}
         <link rel="stylesheet" type="text/css" href="{% static 'css/mysite.css' %}">
 
+        {# jQuery подключается до контента: скрипт расписания (schedule_script.html) использует его #}
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+
         {% block extra_css %}
         {# Override this in templates to add extra stylesheets #}
         {% endblock %}
