@@ -3,7 +3,7 @@
     {% with group=card.group %}
     <section class="sch-card" data-group="{{ group.pk }}">
       <h2 class="sch-card-title">
-        {{ group.title }}
+        {{ group.name }}
         <span class="sch-badge-count">{{ card.lessons|length }} зан.</span>
       </h2>
       <p class="sch-curator">Куратор: <b>{{ group.curator_name }}</b></p>
@@ -36,11 +36,11 @@
                 </td>
                 <td>
                   {% if lesson.subject %}
-                    <span class="sch-subject">{{ lesson.subject.title }}</span>
+                    <span class="sch-subject">{{ lesson.subject.name }}</span>
                   {% else %}
                     <span class="sch-subject">—</span>
                   {% endif %}
-                  {% if lesson.teacher %}<br><small style="color:#6b7280">{{ lesson.teacher.title }}</small>{% endif %}
+                  {% if lesson.teacher %}<br><small style="color:#6b7280">{{ lesson.teacher.name }}</small>{% endif %}
                   {% if lesson.room %}<br><small style="color:#9ca3af">ауд. {{ lesson.room }}</small>{% endif %}
                 </td>
               </tr>

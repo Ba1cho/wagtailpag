@@ -6,8 +6,80 @@ from modelcluster.models import ClusterableModel
 
 from wagtail import blocks
 from wagtail.admin.panels import FieldPanel, InlinePanel, MultiFieldPanel
+from wagtail.admin.viewsets.chooser import ChooserViewSet
 from wagtail.fields import StreamField
-from wagtail.models import Page
+from wagtail.models import Orderable, Page
+
+
+# ---------------------------------------------------------------------------
+# Chooser'ы справочников (предметы, преподаватели, группы) для блока
+# расписания. Каждый chooser — модалка выбора соответствующей инлайн-модели.
+# ---------------------------------------------------------------------------
+
+
+class SubjectChooserViewSet(ChooserViewSet):
+    """Chooser-модалка для выбора предмета из SubjectModel."""
+
+    model = "home.SubjectModel"
+    icon = "doc-full-inverse"
+    # Виджет не нужно навязывать всем ForeignKey на SubjectModel —
+    # используем его только в блоке расписания.
+    register_widget = False
+    choose_one_text = _("Выберите предмет")
+    choose_another_text = _("Выберите другой предмет")
+
+
+subject_chooser_viewset = SubjectChooserViewSet(
+    "subject_chooser", url_prefix="subject-chooser"
+)
+
+SubjectChooserBlock = subject_chooser_viewset.get_block_class(
+    name="SubjectChooserBlock", module_path="home.models"
+)
+
+
+class TeacherChooserViewSet(ChooserViewSet):
+    """Chooser-модалка для выбора преподавателя из TeacherModel."""
+
+    model = "home.TeacherModel"
+    icon = "user"
+    # Виджет не нужно навязывать всем ForeignKey на TeacherModel —
+    # используем его только в блоке расписания.
+    register_widget = False
+    choose_one_text = _("Выберите преподавателя")
+    choose_another_text = _("Выберите другого преподавателя")
+
+
+teacher_chooser_viewset = TeacherChooserViewSet(
+    "teacher_chooser", url_prefix="teacher-chooser"
+)
+
+# Блок-chooser для StreamField. module_path указывает, откуда класс можно
+# импортировать при деconstruction в миграциях.
+TeacherChooserBlock = teacher_chooser_viewset.get_block_class(
+    name="TeacherChooserBlock", module_path="home.models"
+)
+
+
+class GroupChooserViewSet(ChooserViewSet):
+    """Chooser-модалка для выбора группы из GroupModel."""
+
+    model = "home.GroupModel"
+    icon = "group"
+    # Виджет не нужно навязывать всем ForeignKey на GroupModel —
+    # используем его только в блоке расписания.
+    register_widget = False
+    choose_one_text = _("Выберите группу")
+    choose_another_text = _("Выберите другую группу")
+
+
+group_chooser_viewset = GroupChooserViewSet(
+    "group_chooser", url_prefix="group-chooser"
+)
+
+GroupChooserBlock = group_chooser_viewset.get_block_class(
+    name="GroupChooserBlock", module_path="home.models"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -15,52 +87,99 @@ from wagtail.models import Page
 # ---------------------------------------------------------------------------
 
 
-class SubjectPage(Page):
-    """Учебный предмет (страница-справочник)."""
+class SubjectModel(Orderable):
+    """Учебный предмет (инлайн-объект страницы-справочника предметов)."""
 
+    subject_page = ParentalKey(
+        "home.SubjectPage",
+        verbose_name=_("Страница предметов"),
+        on_delete=models.CASCADE,
+        related_name="subjects",
+    )
+    name = models.CharField(_("Название"), max_length=200)
     description = models.TextField(_("Описание"), blank=True)
 
-    parent_page_types = ["home.HomePage"]
-    subpage_types = []
-
-    content_panels = Page.content_panels + [
+    panels = [
+        FieldPanel("name"),
         FieldPanel("description"),
     ]
 
     def __str__(self):
-        return self.title
+        return self.name
 
     class Meta:
         verbose_name = _("Предмет")
         verbose_name_plural = _("Предметы")
 
 
-class TeacherPage(Page):
-    """Преподаватель (страница-справочник)."""
-
-    email = models.EmailField(_("Email"), blank=True)
-    phone = models.CharField(_("Телефон"), max_length=30, blank=True)
+class SubjectPage(Page):
+    """Страница-справочник со списком предметов (заполняется инлайном)."""
 
     parent_page_types = ["home.HomePage"]
     subpage_types = []
 
     content_panels = Page.content_panels + [
-        MultiFieldPanel([FieldPanel("email"), FieldPanel("phone")], _("Контакты")),
+        InlinePanel("subjects", label=_("Предметы")),
     ]
 
     def __str__(self):
         return self.title
 
     class Meta:
+        verbose_name = _("Предметы")
+        verbose_name_plural = _("Предметы")
+
+
+class TeacherModel(Orderable):
+    """Преподаватель (инлайн-объект страницы-справочника преподавателей)."""
+
+    teacher_page = ParentalKey(
+        "home.TeacherPage",
+        verbose_name=_("Страница преподавателей"),
+        on_delete=models.CASCADE,
+        related_name="teachers",
+    )
+    name = models.CharField(_("ФИО"), max_length=200)
+    email = models.EmailField(_("Email"), blank=True)
+    phone = models.CharField(_("Телефон"), max_length=30, blank=True)
+
+    panels = [
+        FieldPanel("name"),
+        FieldPanel("email"),
+        FieldPanel("phone"),
+    ]
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
         verbose_name = _("Преподаватель")
         verbose_name_plural = _("Преподаватели")
 
 
+class TeacherPage(Page):
+    """Страница-справочник со списком преподавателей (заполняется инлайном)."""
+
+    parent_page_types = ["home.HomePage"]
+    subpage_types = []
+
+    content_panels = Page.content_panels + [
+        InlinePanel("teachers", label=_("Преподаватели")),
+    ]
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        verbose_name = _("Преподаватели")
+        verbose_name_plural = _("Преподаватели")
+
+
 class GroupStudent(ClusterableModel):
-    """Студент, принадлежащий странице группы (инлайн-объект)."""
+    """Студент, принадлежащий группе GroupModel (инлайн-объект)."""
 
     group = ParentalKey(
-        "home.GroupPage",
+        "home.GroupModel",
         verbose_name=_("Группа"),
         on_delete=models.CASCADE,
         related_name="students",
@@ -81,17 +200,22 @@ class GroupStudent(ClusterableModel):
         verbose_name_plural = _("Студенты")
 
 
-class GroupPage(Page):
-    """Учебная группа (страница-справочник) с куратором и студентами."""
+class GroupModel(Orderable, ClusterableModel):
+    """Учебная группа (инлайн-объект) с куратором и студентами."""
 
+    group_page = ParentalKey(
+        "home.GroupPage",
+        verbose_name=_("Страница групп"),
+        on_delete=models.CASCADE,
+        related_name="groups",
+    )
+    name = models.CharField(_("Название"), max_length=200)
     curator_name = models.CharField(_("Имя куратора"), max_length=100, blank=True)
     curator_email = models.EmailField(_("Email куратора"), blank=True)
     curator_phone = models.CharField(_("Телефон куратора"), max_length=30, blank=True)
 
-    parent_page_types = ["home.HomePage"]
-    subpage_types = []
-
-    content_panels = Page.content_panels + [
+    panels = [
+        FieldPanel("name"),
         MultiFieldPanel(
             [
                 FieldPanel("curator_name"),
@@ -104,10 +228,28 @@ class GroupPage(Page):
     ]
 
     def __str__(self):
-        return self.title
+        return self.name
 
     class Meta:
         verbose_name = _("Группа")
+        verbose_name_plural = _("Группы")
+
+
+class GroupPage(Page):
+    """Страница-справочник со списком групп (заполняется инлайном)."""
+
+    parent_page_types = ["home.HomePage"]
+    subpage_types = []
+
+    content_panels = Page.content_panels + [
+        InlinePanel("groups", label=_("Группы")),
+    ]
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        verbose_name = _("Группы")
         verbose_name_plural = _("Группы")
 
 
@@ -119,17 +261,13 @@ class GroupPage(Page):
 class LessonBlock(blocks.StructBlock):
     """Одно занятие внутри дня расписания."""
 
-    subject = blocks.PageChooserBlock(
-        page_type="home.SubjectPage", required=True, label=_("Предмет")
-    )
-    teacher = blocks.PageChooserBlock(
-        page_type="home.TeacherPage", required=False, label=_("Преподаватель")
-    )
+    subject = SubjectChooserBlock(required=True, label=_("Предмет"))
+    teacher = TeacherChooserBlock(required=False, label=_("Преподаватель"))
     start_time = blocks.TimeBlock(required=True, label=_("Начало"))
     end_time = blocks.TimeBlock(required=True, label=_("Конец"))
     room = blocks.CharBlock(required=False, label=_("Аудитория"))
     groups = blocks.ListBlock(
-        blocks.PageChooserBlock(page_type="home.GroupPage"),
+        GroupChooserBlock(),
         min_num=1,
         label=_("Группы"),
     )
@@ -195,10 +333,8 @@ class SchedulePage(Page):
     def get_context(self, request, *args, **kwargs):
         context = super().get_context(request, *args, **kwargs)
 
-        # Группы для чипов фильтра (все опубликованные группы).
-        schedule_groups = list(
-            GroupPage.objects.live().public().order_by("title")
-        )
+        # Группы для чипов фильтра (все группы из справочника GroupModel).
+        schedule_groups = list(GroupModel.objects.order_by("name"))
         context["schedule_groups"] = schedule_groups
         context["hours"] = range(6, 23)
 
@@ -223,20 +359,20 @@ class SchedulePage(Page):
                 if lesson_block.block_type != "lesson":
                     continue
                 value = lesson_block.value
-                subject_page = value["subject"]
-                teacher_page = value["teacher"]
+                subject = value["subject"]
+                teacher = value["teacher"]
                 lesson_groups = [g for g in value["groups"] if g is not None]
                 lesson = {
                     "start": value["start_time"],
                     "end": value["end_time"],
                     "start_hour": value["start_time"].hour,
                     "end_hour": value["end_time"].hour,
-                    "subject": subject_page,
-                    "teacher": teacher_page,
+                    "subject": subject,
+                    "teacher": teacher,
                     "room": value["room"] or "",
                     "groups": lesson_groups,
                     "group_pks": ",".join(str(g.pk) for g in lesson_groups),
-                    "group_names": ", ".join(g.title for g in lesson_groups),
+                    "group_names": ", ".join(g.name for g in lesson_groups),
                     "color": (
                         group_colors.get(lesson_groups[0].pk, 0)
                         if lesson_groups

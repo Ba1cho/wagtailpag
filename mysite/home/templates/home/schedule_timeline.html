@@ -3,7 +3,7 @@
     {% for group in schedule_groups %}
       <span class="sch-wk-legend-item">
         <span class="sch-wk-dot {% cycle 'sch-wk-g0' 'sch-wk-g1' 'sch-wk-g2' 'sch-wk-g3' 'sch-wk-g4' 'sch-wk-g5' 'sch-wk-g6' 'sch-wk-g7' %}"></span>
-        {{ group.title }}
+        {{ group.name }}
       </span>
     {% endfor %}
   </div>
@@ -32,11 +32,11 @@
                    data-date="{{ lesson.date_iso }}"
                    data-start="{{ lesson.start|time:'H:i' }}"
                    data-end="{{ lesson.end|time:'H:i' }}"
-                   title="{{ lesson.group_names }} — {% if lesson.subject %}{{ lesson.subject.title }}{% endif %}">
+                   title="{{ lesson.group_names }} — {% if lesson.subject %}{{ lesson.subject.name }}{% endif %}">
                 <span class="sch-wk-block-time">{{ lesson.start|time:"H:i" }}–{{ lesson.end|time:"H:i" }}</span>
-                <span class="sch-wk-block-subject">{% if lesson.subject %}{{ lesson.subject.title }}{% else %}—{% endif %}</span>
+                <span class="sch-wk-block-subject">{% if lesson.subject %}{{ lesson.subject.name }}{% else %}—{% endif %}</span>
                 <span class="sch-wk-block-groups">{{ lesson.group_names }}</span>
-                {% if lesson.teacher %}<span class="sch-wk-block-meta">{{ lesson.teacher.title }}</span>{% endif %}
+                {% if lesson.teacher %}<span class="sch-wk-block-meta">{{ lesson.teacher.name }}</span>{% endif %}
                 {% if lesson.room %}<span class="sch-wk-block-meta">ауд. {{ lesson.room }}</span>{% endif %}
               </div>
             {% endfor %}
