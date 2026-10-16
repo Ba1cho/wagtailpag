@@ -127,16 +127,20 @@
 
 {% block content %}
 <div class="sch">
-  <h1>{{ page.title }}</h1>
-  <p class="sch-sub">Расписание занятий по датам и группам. Используйте фильтры ниже.</p>
+  <h1 class="mb-1">{{ page.title }}</h1>
+  <p class="sch-sub text-muted mb-4">Расписание занятий по датам и группам. Сначала выберите куратора, затем — остальные фильтры.</p>
 
   {% include "home/schedule_filters.html" %}
-  <h2 class="sch-section sch-section-first">Группы</h2>
-  {% include "home/schedule_cards.html" %}
-  <h2 class="sch-section">Таймлайн по датам</h2>
-  {% include "home/schedule_timeline.html" %}
 
-  <p class="sch-nothing hidden" id="sch-nothing">По выбранным фильтрам занятий не найдено.</p>
+  {# Расписание показывается только после выбора куратора (см. schedule_script.html) #}
+  <div id="sch-dependent-content" class="sch-dependent d-none">
+    <h2 class="sch-section sch-section-first">Группы</h2>
+    {% include "home/schedule_cards.html" %}
+    <h2 class="sch-section">Таймлайн по датам</h2>
+    {% include "home/schedule_timeline.html" %}
+
+    <p class="sch-nothing alert alert-info mb-0" id="sch-nothing">По выбранным фильтрам занятий не найдено.</p>
+  </div>
 </div>
 
 <!-- Модальное окно с деталями группы (открывается кликом по группе) -->

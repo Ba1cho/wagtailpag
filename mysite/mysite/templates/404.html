@@ -5,7 +5,10 @@
 {% block body_class %}template-404{% endblock %}
 
 {% block content %}
-<h1>Page not found</h1>
+<div class="container py-5 text-center">
+  <h1 class="display-5 fw-bold">Страница не найдена</h1>
 
-<h2>Sorry, this page could not be found.</h2>
+  <p class="lead text-muted">К сожалению, эта страница не существует или была перемещена.</p>
+  <a href="/" class="btn btn-primary">На главную</a>
+</div>
 {% endblock %}

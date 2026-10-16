@@ -12,6 +12,9 @@ $(function () {
   var $hourFrom = $('#sch-hour-from');
   var $hourTo = $('#sch-hour-to');
   var $resetBtn = $('#sch-reset');
+  var $dependentFilters = $('#sch-dependent-filters');
+  var $dependentContent = $('#sch-dependent-content');
+  var $dependentHint = $('#sch-dependent-hint');
   var $cards = $('#sch-cards > .sch-card');
   var $timeline = $('#sch-timeline');
   var $weekRoot = $('#sch-week');
@@ -25,7 +28,7 @@ $(function () {
 
   var MIN_HOUR = 6, MAX_HOUR = 23, HOUR_PX = 56; // должно совпадать с --hour-h и range(6, 23) в модели
   var WEEKDAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  var state = { curator: 'all', weekday: 'all', weekStart: '', weekEnd: '', hourFrom: '', hourTo: '' };
+  var state = { curator: '', weekday: 'all', weekStart: '', weekEnd: '', hourFrom: '', hourTo: '' };
   var groupMeta = {}; // pk группы -> { curator, label, check, enabled }
   var weekBuilt = false;
 
@@ -96,9 +99,10 @@ $(function () {
     return iso >= state.weekStart && iso <= state.weekEnd;
   }
 
-  /* Группа относится к выбранному куратору (или куратор не выбран). */
+  /* Группа относится к выбранному куратору.
+     Пока куратор не выбран — расписание пустое (каскад: куратор -> остальные фильтры). */
   function inCuratorScope(pk) {
-    if (state.curator === 'all') return true;
+    if (state.curator === '') return false;
     var meta = groupMeta[pk];
     return !!meta && meta.curator === state.curator;
   }
@@ -120,7 +124,7 @@ $(function () {
     var enabled = meta ? meta.enabled : true;
     var curator = meta ? meta.curator : ($card.attr('data-curator') || '');
     if (!enabled) return false;
-    return state.curator === 'all' || curator === state.curator;
+    return state.curator !== '' && curator === state.curator;
   }
 
   function rowMatches($tr) {
@@ -142,12 +146,20 @@ $(function () {
   function refreshGroupList() {
     var visible = 0;
     $.each(groupMeta, function (pk, meta) {
-      var show = state.curator === 'all' || meta.curator === state.curator;
+      var show = state.curator !== '' && meta.curator === state.curator;
       meta.label.toggleClass('hidden', !show);
       if (show) visible++;
     });
     if ($groupEmpty.length) $groupEmpty.toggleClass('hidden', visible > 0);
     syncGroupAll();
+  }
+
+  /* Каскад фильтров: пока куратор не выбран — скрыты остальные фильтры и расписание. */
+  function updateCascade() {
+    var curatorChosen = state.curator !== '';
+    if ($dependentFilters.length) $dependentFilters.toggleClass('d-none', !curatorChosen);
+    if ($dependentContent.length) $dependentContent.toggleClass('d-none', !curatorChosen);
+    if ($dependentHint.length) $dependentHint.toggleClass('d-none', curatorChosen);
   }
 
   /* Мастер-галочка «Все группы» отражает состояние групп в области видимости. */
@@ -211,7 +223,7 @@ $(function () {
     $legendItems.each(function () {
       var $item = $(this);
       var meta = groupMeta[$item.attr('data-group')];
-      var active = !!meta && meta.enabled && (state.curator === 'all' || meta.curator === state.curator);
+      var active = !!meta && meta.enabled && state.curator !== '' && meta.curator === state.curator;
       $item.toggleClass('inactive', !active);
     });
     layoutLanes();
@@ -385,11 +397,12 @@ $(function () {
     openModal($(this).attr('data-group'));
   });
 
-  /* Сначала куратор — затем видны его группы и занятия. */
+  /* Сначала куратор — после его выбора открываются остальные фильтры и расписание. */
   $curatorRow.on('click', '.chip', function () {
     var $chip = $(this);
     setChipActive($curatorRow, $chip);
-    state.curator = $chip.attr('data-curator');
+    state.curator = $chip.attr('data-curator') || '';
+    updateCascade();
     refreshGroupList();
     apply();
   });
@@ -413,14 +426,16 @@ $(function () {
   $hourTo.on('change', function () { state.hourTo = $hourTo.val(); apply(); });
 
   $resetBtn.on('click', function () {
-    state.curator = 'all';
+    state.curator = '';
     state.weekday = 'all';
     state.hourFrom = '';
     state.hourTo = '';
     $hourFrom.val(''); $hourTo.val('');
-    setChipActive($curatorRow, $curatorRow.find('[data-curator="all"]'));
+    // куратор снова не выбран — возвращаемся к шагу 1
+    $curatorRow.find('.chip').removeClass('active');
     setChipActive($weekdayRow, $weekdayRow.find('[data-weekday="all"]'));
-    // все группы снова включены и видны
+    updateCascade();
+    // все группы снова включены и видны (внутри скрытого списка)
     $.each(groupMeta, function (pk, meta) {
       meta.enabled = true;
       meta.check.prop('checked', true);
@@ -437,8 +452,9 @@ $(function () {
     apply();
   });
 
-  /* Первичная синхронизация: видимость групп + фильтры по текущей неделе.
-     Таймлайн виден вместе с карточками — сразу раскладываем его сетку. */
+  /* Первичная синхронизация: каскад (куратор пока не выбран), группы, неделя.
+     Таймлайн раскладываем сразу — он станет виден вместе с карточками. */
+  updateCascade();
   refreshGroupList();
   positionWeek();
   updateWeekHeaders();
