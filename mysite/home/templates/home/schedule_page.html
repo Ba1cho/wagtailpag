@@ -122,6 +122,12 @@
   .sch-modal-body .sch-card { border:none; box-shadow:none; padding:0; cursor:default; }
   .sch-modal-body .sch-card-hint { display:none; }
   body.sch-modal-open { overflow:hidden; }
+
+  /* ---- Состав группы (содержимое модалки, открытой из фильтров) ---- */
+  .sch-roster-title { font-size:1.35rem; font-weight:700; margin:0 0 .15rem; padding-right:2rem; }
+  .sch-roster-count { color:var(--muted); font-size:.85rem; margin:.5rem 0 .75rem; }
+  .sch-roster-list { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.4rem; }
+  .sch-roster-list li { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:.45rem .7rem; font-size:.9rem; }
 </style>
 {% endblock extra_css %}
 
@@ -150,6 +156,22 @@
     <button type="button" class="sch-modal-close" data-modal-close aria-label="Закрыть">&times;</button>
     <div class="sch-modal-body" id="sch-group-modal-body"></div>
   </div>
+</div>
+
+{# Скрытые данные о составе групп: источник контента для модалки из фильтров #}
+<div class="d-none" id="sch-group-rosters" aria-hidden="true">
+  {% for card in group_cards %}
+    {% with group=card.group %}
+    <div data-group="{{ group.pk }}"
+         data-name="{{ group.name }}"
+         data-curator-name="{% if group.curator %}{{ group.curator.name }}{% endif %}"
+         data-curator-phone="{% if group.curator %}{{ group.curator.phone }}{% endif %}">
+      {% for student in card.students %}
+        <span class="sch-roster-student">{{ student.last_name }} {{ student.first_name }}</span>
+      {% endfor %}
+    </div>
+    {% endwith %}
+  {% endfor %}
 </div>
 
 {% include "home/schedule_script.html" %}

@@ -331,12 +331,54 @@ $(function () {
   }
 
   /* ---- Модальное окно группы (клик по карточке/названию в списке) ---- */
-  function openModal(pk) {
+  function openCard(pk) {
     if (!$modal.length || !$modalBody.length) return;
     var $card = $('#sch-cards > .sch-card[data-group="' + pk + '"]');
     $modalBody.empty();
     if ($card.length) {
       $card.clone().removeClass('hidden selected').appendTo($modalBody);
+    }
+    $modal.removeClass('hidden');
+    $('body').addClass('sch-modal-open');
+  }
+
+  /* Модалка со составом группы — открывается кликом по группе в фильтрах. */
+  function openRoster(pk) {
+    if (!$modal.length || !$modalBody.length) return;
+    var $roster = $('#sch-group-rosters > [data-group="' + pk + '"]');
+    $modalBody.empty();
+    if ($roster.length) {
+      var $students = $roster.children('.sch-roster-student');
+      var $wrap = $('<div class="sch-roster"></div>');
+      $wrap.append(
+        $('<h2 class="sch-roster-title"></h2>').text($roster.attr('data-name') || '')
+      );
+      var $curator = $('<p class="sch-curator"></p>');
+      var curatorName = $roster.attr('data-curator-name') || '';
+      if (curatorName) {
+        $curator.append(document.createTextNode('Куратор: '));
+        $curator.append($('<b></b>').text(curatorName));
+        var curatorPhone = $roster.attr('data-curator-phone') || '';
+        if (curatorPhone) {
+          $curator.append($('<span class="sch-curator-phone"></span>').text(' ' + curatorPhone));
+        }
+      } else {
+        $curator.append($('<span class="sch-empty"></span>').text('Куратор не назначен'));
+      }
+      $wrap.append($curator);
+      $wrap.append(
+        $('<p class="sch-roster-count"></p>').text('Состав группы: ' + $students.length + ' чел.')
+      );
+      if ($students.length) {
+        var $list = $('<ul class="sch-roster-list"></ul>');
+        $students.each(function () {
+          $list.append($('<li></li>').text($(this).text()));
+        });
+        $wrap.append($list);
+      } else {
+        $wrap.append($('<p class="sch-empty"></p>').text('Студенты пока не добавлены.'));
+      }
+      $modalBody.append($wrap);
     }
     $modal.removeClass('hidden');
     $('body').addClass('sch-modal-open');
@@ -357,13 +399,13 @@ $(function () {
     });
   }
 
-  /* Клик по названию группы в списке фильтра открывает модалку;
+  /* Клик по названию группы в списке фильтра открывает модалку со составом;
      клик непосредственно по флажку только переключает активность. */
   if ($groupList.length) {
     $groupList.on('click', '.sch-check[data-group]', function (e) {
       if ($(e.target).closest('input').length) return;
       e.preventDefault();
-      openModal($(this).attr('data-group'));
+      openRoster($(this).attr('data-group'));
     });
 
     $groupList.on('change', 'input[type="checkbox"]', function () {
@@ -392,9 +434,9 @@ $(function () {
     });
   }
 
-  /* Клик по карточке группы — модальное окно с деталями. */
+  /* Клик по карточке группы — модальное окно с деталями (как было). */
   $cards.on('click', function () {
-    openModal($(this).attr('data-group'));
+    openCard($(this).attr('data-group'));
   });
 
   /* Сначала куратор — после его выбора открываются остальные фильтры и расписание. */
