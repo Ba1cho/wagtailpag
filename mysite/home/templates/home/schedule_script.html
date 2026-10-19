@@ -3,7 +3,7 @@
 $(function () {
   'use strict';
 
-  var $curatorRow = $('#sch-curator-row');
+  var $curatorSelect = $('#sch-curator-select');
   var $groupList = $('#sch-group-list');
   var $groupAll = $('#sch-group-all');
   var $groupEmpty = $('#sch-group-empty');
@@ -440,14 +440,14 @@ $(function () {
   });
 
   /* Сначала куратор — после его выбора открываются остальные фильтры и расписание. */
-  $curatorRow.on('click', '.chip', function () {
-    var $chip = $(this);
-    setChipActive($curatorRow, $chip);
-    state.curator = $chip.attr('data-curator') || '';
-    updateCascade();
-    refreshGroupList();
-    apply();
-  });
+  if ($curatorSelect.length) {
+    $curatorSelect.on('change', function () {
+      state.curator = $curatorSelect.val() || '';
+      updateCascade();
+      refreshGroupList();
+      apply();
+    });
+  }
 
   $weekdayRow.on('click', '.chip', function () {
     var $chip = $(this);
@@ -474,7 +474,7 @@ $(function () {
     state.hourTo = '';
     $hourFrom.val(''); $hourTo.val('');
     // куратор снова не выбран — возвращаемся к шагу 1
-    $curatorRow.find('.chip').removeClass('active');
+    if ($curatorSelect.length) $curatorSelect.val('');
     setChipActive($weekdayRow, $weekdayRow.find('[data-weekday="all"]'));
     updateCascade();
     // все группы снова включены и видны (внутри скрытого списка)

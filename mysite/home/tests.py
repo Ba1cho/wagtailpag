@@ -178,10 +178,10 @@ class SchedulePageTests(WagtailPageTestCase):
         response = self.client.get(self.schedule.url)
         html = response.content.decode("utf-8")
 
-        # Фильтр куратора, чекбоксы групп, select недель, модальное окно.
+        # Фильтр куратора (выпадающий список), чекбоксы групп, select недель, модальное окно.
         self.assertIn('id="sch-curator-row"', html)
-        self.assertIn('data-curator="all"', html)
-        self.assertIn(f'data-curator="{self.curator.pk}"', html)
+        self.assertIn('id="sch-curator-select"', html)
+        self.assertIn(f'<option value="{self.curator.pk}">', html)
         self.assertIn('id="sch-group-list"', html)
         self.assertIn('id="sch-group-all"', html)
         self.assertIn('id="sch-week-select"', html)

@@ -2,11 +2,16 @@
   <!-- Шаг 1: сначала выбираем куратора -->
   <div class="sch-filter-row mb-3" id="sch-curator-row">
     <span class="sch-filter-label fw-semibold text-uppercase text-muted small">Куратор</span>
-    {% for curator in curators %}
-      <button type="button" class="chip me-1 mb-1" data-curator="{{ curator.pk }}">{{ curator.name }}</button>
-    {% empty %}
+    {% if curators %}
+      <select class="form-select form-select-sm w-auto d-inline-block" id="sch-curator-select">
+        <option value="">— выберите куратора —</option>
+        {% for curator in curators %}
+          <option value="{{ curator.pk }}">{{ curator.name }}</option>
+        {% endfor %}
+      </select>
+    {% else %}
       <span class="text-muted fst-italic small">Кураторы не найдены.</span>
-    {% endfor %}
+    {% endif %}
   </div>
 
   <p class="small text-muted fst-italic mb-0" id="sch-dependent-hint">
