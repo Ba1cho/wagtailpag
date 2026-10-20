@@ -190,19 +190,26 @@ $(function () {
     $cards.each(function () {
       var $card = $(this);
       var groupOk = cardGroupOk($card);
+      // Карточка видна, если группа проходит фильтр куратора/галочек —
+      // даже когда в выбранной неделе у неё нет занятий (как колонки таймлайна).
+      $card.toggleClass('hidden', !groupOk);
+      if (!groupOk) return;
       var anyVisible = false;
-      if (groupOk) {
-        var $rows = $card.find('tbody tr');
-        $rows.each(function () {
-          var $tr = $(this);
-          var ok = rowMatches($tr);
-          $tr.toggleClass('hidden', !ok);
-          if (ok) anyVisible = true;
-        });
-        if ($rows.length === 0) anyVisible = true;
-      }
-      $card.toggleClass('hidden', !(groupOk && anyVisible));
-      if (groupOk && anyVisible) visibleCards++;
+      var $rows = $card.find('tbody tr');
+      $rows.each(function () {
+        var $tr = $(this);
+        var ok = rowMatches($tr);
+        $tr.toggleClass('hidden', !ok);
+        if (ok) anyVisible = true;
+      });
+      var $table = $card.find('.sch-table');
+      var $empty = $card.find('.sch-card-empty');
+      // Без видимых строк прячем таблицу и показываем подпись «нет занятий».
+      if ($table.length) $table.toggleClass('d-none', !anyVisible);
+      // Статическая подпись «Занятий нет.» (у групп без занятий вовсе) остаётся видимой всегда.
+      if ($empty.length && $rows.length) $empty.toggleClass('d-none', anyVisible);
+      // Для сообщения «не найдено» учитываем только карточки с хотя бы одним занятием.
+      if (anyVisible) visibleCards++;
     });
     updateBadges();
 

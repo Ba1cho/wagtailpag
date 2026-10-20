@@ -53,8 +53,10 @@
             {% endfor %}
           </tbody>
         </table>
+        {# Подсказка для JS: показывается, когда в выбранной неделе нет занятий группы. #}
+        <p class="sch-empty sch-card-empty d-none">Занятий нет по выбранным фильтрам.</p>
       {% else %}
-        <p class="sch-empty">Занятий нет.</p>
+        <p class="sch-empty sch-card-empty">Занятий нет.</p>
       {% endif %}
       <p class="sch-card-hint">Клик по группе — подробнее</p>
     </section>

@@ -1,5 +1,5 @@
 """Тесты страниц приложения home."""
-from datetime import date, time
+from datetime import date, time, timedelta
 
 from wagtail.models import Page, Site
 from wagtail.test.utils import WagtailPageTestCase
@@ -156,8 +156,12 @@ class SchedulePageTests(WagtailPageTestCase):
         self.assertEqual(len(current), 1)
         # Пример периода: 12–16 октября 2026 (пн–пт).
         self.assertIn("октября 2026", current[0]["label"])
-        self.assertEqual(current[0]["start_iso"], "2026-10-12")
-        self.assertEqual(current[0]["end_iso"], "2026-10-16")
+        # Текущая неделя — пн–пт вокруг сегодняшней даты.
+        today = date.today()
+        monday = today - timedelta(days=today.weekday())
+        friday = monday + timedelta(days=4)
+        self.assertEqual(current[0]["start_iso"], monday.isoformat())
+        self.assertEqual(current[0]["end_iso"], friday.isoformat())
 
     def test_rendered_html_contains_lesson_data(self):
         self.schedule.schedule = self._schedule_stream()
@@ -461,3 +465,123 @@ class CuratorTests(WagtailPageTestCase):
         response = self.client.get(f"/admin/pages/{self.curator_page.pk}/edit/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "curators")
+
+
+class InlinePanelChildHeadingTests(WagtailPageTestCase):
+    """Заголовок ребёнка InlinePanel — str(instance), а не статичный label."""
+
+    def setUp(self):
+        root_page = Page.get_first_root_node()
+        Site.objects.create(
+            hostname="testsite", root_page=root_page, is_default_site=True
+        )
+        self.homepage = HomePage(title="Home")
+        root_page.add_child(instance=self.homepage)
+
+        self.curator_page = CuratorPage(title="Кураторы")
+        self.homepage.add_child(instance=self.curator_page)
+        self.curator = CuratorModel.objects.create(
+            curator_page=self.curator_page, name="Петров П.П.", phone="899900000"
+        )
+
+        self.group_page = GroupPage(title="Группы")
+        self.homepage.add_child(instance=self.group_page)
+        self.group = GroupModel.objects.create(
+            group_page=self.group_page, name="ПИ-20", curator=self.curator
+        )
+        GroupStudent = self.group.students.model
+        self.student = GroupStudent.objects.create(
+            group=self.group, first_name="Иван", last_name="Сидоров"
+        )
+
+    def test_inline_child_heading_uses_model_field(self):
+        # Переопределённый шаблон wagtailadmin/panels/inline_panel_child.html
+        # подставляет в заголовок str(instance): название группы, ФИО студента.
+        self.login()
+        response = self.client.get(f"/admin/pages/{self.group_page.pk}/edit/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ПИ-20")
+        self.assertContains(response, "Сидоров Иван")
+
+    def test_inline_child_empty_form_falls_back_to_label(self):
+        # У ещё не сохранённых записей (без pk) остаётся статический label панели
+        # и счётчик (шаблон пустой формы инлайн-панели).
+        self.login()
+        response = self.client.get(f"/admin/pages/{self.group_page.pk}/edit/")
+        self.assertContains(response, "inline_child_groups-__prefix__")
+        self.assertContains(response, "data-inline-panel-child-count")
+
+
+class ScheduleCardWeekFilterTests(WagtailPageTestCase):
+    """Карточки групп при фильтрации по неделе: подпись «занятий нет» в разметке."""
+
+    def setUp(self):
+        root_page = Page.get_first_root_node()
+        Site.objects.create(
+            hostname="testsite", root_page=root_page, is_default_site=True
+        )
+        self.homepage = HomePage(title="Home")
+        root_page.add_child(instance=self.homepage)
+
+        self.schedule = SchedulePage(title="Расписание")
+        self.homepage.add_child(instance=self.schedule)
+
+        self.subject_page = SubjectPage(title="Предметы")
+        self.homepage.add_child(instance=self.subject_page)
+        self.subject = SubjectModel.objects.create(
+            subject_page=self.subject_page, name="Математика"
+        )
+
+        self.curator_page = CuratorPage(title="Кураторы")
+        self.homepage.add_child(instance=self.curator_page)
+        self.curator = CuratorModel.objects.create(
+            curator_page=self.curator_page, name="Петров П.П."
+        )
+
+        self.group_page = GroupPage(title="Группы")
+        self.homepage.add_child(instance=self.group_page)
+        # Группа с занятиями...
+        self.group_with = GroupModel.objects.create(
+            group_page=self.group_page, name="ПИ-20", curator=self.curator
+        )
+        # ...и группа вовсе без занятий.
+        self.group_without = GroupModel.objects.create(
+            group_page=self.group_page, name="ПИ-21", curator=self.curator
+        )
+
+        self.schedule.schedule = [
+            {
+                "type": "day",
+                "value": {
+                    "date": date(2026, 10, 12),
+                    "lessons": [
+                        {
+                            "type": "lesson",
+                            "value": {
+                                "subject": self.subject.pk,
+                                "teacher": None,
+                                "start_time": time(10, 0),
+                                "end_time": time(11, 30),
+                                "room": "222",
+                                "groups": [self.group_with.pk],
+                            },
+                        }
+                    ],
+                },
+            },
+        ]
+        self.schedule.save()
+
+    def test_card_with_lessons_renders_week_empty_hint(self):
+        # В карточке с занятиями есть скрытая подсказка, которую JS показывает
+        # при выборе недели без занятий этой группы.
+        response = self.client.get(self.schedule.url)
+        html = response.content.decode("utf-8")
+        self.assertIn("sch-card-empty", html)
+        self.assertIn("Занятий нет по выбранным фильтрам.", html)
+
+    def test_card_without_lessons_keeps_static_hint(self):
+        # Группа без занятий показывает статическую подпись «Занятий нет.».
+        response = self.client.get(self.schedule.url)
+        html = response.content.decode("utf-8")
+        self.assertIn('<p class="sch-empty sch-card-empty">Занятий нет.</p>', html)
