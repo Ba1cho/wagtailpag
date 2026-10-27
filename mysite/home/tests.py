@@ -5,11 +5,15 @@ from wagtail.models import Page, Site
 from wagtail.test.utils import WagtailPageTestCase
 
 from home.models import (
+    CardBlock,
     CuratorModel,
     CuratorPage,
+    DocumentBlock,
     GroupModel,
     GroupPage,
     HomePage,
+    MultiBlockPage,
+    QuoteBlock,
     SchedulePage,
     SubjectModel,
     SubjectPage,
@@ -585,3 +589,70 @@ class ScheduleCardWeekFilterTests(WagtailPageTestCase):
         response = self.client.get(self.schedule.url)
         html = response.content.decode("utf-8")
         self.assertIn('<p class="sch-empty sch-card-empty">Занятий нет.</p>', html)
+
+
+class MultiBlockPageTests(WagtailPageTestCase):
+    """Проверяем страницу с повторяющимися блоками (документ / цитата / карточка)."""
+
+    def setUp(self):
+        root_page = Page.get_first_root_node()
+        Site.objects.create(
+            hostname="testsite", root_page=root_page, is_default_site=True
+        )
+        self.homepage = HomePage(title="Home")
+        root_page.add_child(instance=self.homepage)
+        self.page = MultiBlockPage(title="Тестовая страница блоков")
+        self.homepage.add_child(instance=self.page)
+
+    def _block_stream(self):
+        return [
+            {"type": "document", "value": {"document": None, "title": "Док 1", "description": "Описание первого"}},
+            {"type": "quote", "value": {"text": "Цитата первая", "author": "Автор 1", "source": "Источник 1"}},
+            {"type": "card", "value": {"heading": "Карточка 1", "text": "Текст карточки 1", "image": None, "link_url": ""}},
+            {"type": "document", "value": {"document": None, "title": "Док 2", "description": ""}},
+            {"type": "quote", "value": {"text": "Цитата вторая", "author": "", "source": ""}},
+            {"type": "card", "value": {"heading": "Карточка 2", "text": "", "image": None, "link_url": "https://example.com"}},
+        ]
+
+    def test_page_is_renderable(self):
+        self.page.body = self._block_stream()
+        self.page.save()
+        self.assertPageIsRenderable(self.page)
+
+    def test_template_used(self):
+        self.page.body = self._block_stream()
+        self.page.save()
+        response = self.client.get(self.page.url)
+        self.assertTemplateUsed(response, "home/multi_block_page.html")
+
+    def test_repeating_blocks_rendered(self):
+        """Два документа, две цитаты и две карточки рендерятся без дублирования кода."""
+        self.page.body = self._block_stream()
+        self.page.save()
+        response = self.client.get(self.page.url)
+        html = response.content.decode("utf-8")
+
+        # Два документа с разными заголовками
+        self.assertIn("Док 1", html)
+        self.assertIn("Док 2", html)
+
+        # Две цитаты
+        self.assertIn("Цитата первая", html)
+        self.assertIn("Цитата вторая", html)
+
+        # Две карточки
+        self.assertIn("Карточка 1", html)
+        self.assertIn("Карточка 2", html)
+
+        # Описание первого документа и ссылка второй карточки попали в HTML
+        self.assertIn("Описание первого", html)
+        self.assertIn("https://example.com", html)
+
+    def test_empty_body_shows_info(self):
+        """При пустом StreamField показывается информационное сообщение, а не ошибка."""
+        self.page.body = []
+        self.page.save()
+        response = self.client.get(self.page.url)
+        html = response.content.decode("utf-8")
+        self.assertIn("Контент пока не добавлен", html)
+

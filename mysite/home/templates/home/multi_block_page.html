@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags static %}
+
+{% block body_class %}template-multiblockpage{% endblock %}
+
+{% block content %}
+  <div class="container py-4">
+    <h1>{{ page.title }}</h1>
+
+    {% if page.body %}
+      <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for block in page.body %}
+          <div class="col">
+            {% include_block block %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-info">Контент пока не добавлен.</div>
+    {% endif %}
+  </div>
+{% endblock %}

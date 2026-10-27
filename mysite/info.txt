@@ -1,0 +1,311 @@
+Ниже — полный обзор всех архитектурных вариантов реализации страницы, на которой около 50% контента повторяется (два блока документов, две цитаты, две карточки и т.д.), с примерами кода под ваш стек (Wagtail 7.3rc1 + Django 6), оценкой дублирования и сложности.
+
+1. Что именно повторяется
+Блок	Что внутри	Сколько на странице
+Документ	файл + заголовок + описание	2 (и более)
+Цитата	текст + автор + источник	2 (и более)
+Карточка	заголовок + текст + картинка + ссылка	2 (и более)
+Цель: минимум дублирования полей в модели, минимум дублирования HTML в шаблоне, без избыточной сложности проекта.
+
+Вариант А. Плоский набор полей модели (антипаттерн)
+Идея
+Добавить в модель страницы отдельные поля: document_1, document_2, quote_1, quote_2, card_1, card_2.
+
+Код (пример, не использовать)
+
+class RepeatingPage(Page):
+    document_1 = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    document_2 = models.ForeignKey(Document, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    document_1_title = models.CharField(max_length=200, blank=True)
+    document_2_title = models.CharField(max_length=200, blank=True)
+    quote_1_text = models.TextField(blank=True)
+    quote_2_text = models.TextField(blank=True)
+    # ... и так для каждого поля
+    content_panels = Page.content_panels + [
+        FieldPanel("document_1"), FieldPanel("document_2"),
+        FieldPanel("quote_1_text"), FieldPanel("quote_2_text"),
+    ]
+Шаблон ( duplicates everywhere )
+
+{% if document_1 %}<div class="card">...{{ document_1 }}...</div>{% endif %}
+{% if document_2 %}<div class="card">...{{ document_2 }}...</div>{% endif %}
+{% if quote_1_text %}<blockquote>{{ quote_1_text }}</blockquote>{% endif %}
+{% if quote_2_text %}<blockquote>{{ quote_2_text }}</blockquote>{% endif %}
+Плюсы
+Просто понять новичку.
+Нет новых абстракций.
+Минусы
+Жёсткий лимит: если редактор захочет третьего документа — нужна новая миграция.
+Дублирование HTML: карточка документа описана 2 раза в шаблоне.
+Дублирование в админке: 6+ панелей вместо одной.
+Миграции растут linearly с количеством блоков.
+Вердикт
+❌ Не использовать. Нарушает принцип DRY и не масштабируется.
+
+Вариант Б. Несколько StreamField (по одному на тип)
+Идея
+Каждый тип блока получает своё поле StreamField:
+
+
+class MultiFieldPage(Page):
+    documents = StreamField([("doc", DocumentChooserBlock())], blank=True, use_json_field=True)
+    quotes = StreamField([("quote", QuoteBlock())], blank=True, use_json_field=True)
+    cards = StreamField([("card", CardBlock())], blank=True, use_json_field=True)
+Шаблон
+
+{% for block in page.documents %}{% include_block block %}{% endfor %}
+{% for block in page.quotes %}{% include_block block %}{% endfor %}
+{% for block in page.cards %}{% include_block block %}{% endfor %}
+Плюсы
+Каждый тип изолирован, просто валидировать.
+Редактор видит отдельные панели для документов, цитат, карточек.
+Минусы
+Три панели в админке вместо одной — больше кликов для редактора.
+Нет единого порядка блоков (сначала все документы, затем все цитаты — нельзя перемешать).
+Если нужно «ровно два документа и две цитаты в произвольном порядке», этот вариант не подходит.
+Дублирование цикла {% for %} в шаблоне (хотя мало).
+Вердикт
+⚠️ Допустимо, если блоки строго разделены по секциям страницы и порядок между типами не важен. Но для «50% повторов в любом порядке» неудобно.
+
+Вариант В. Один StreamField с StructBlock (реализован в проекте)
+Идея
+Одно поле body = StreamField([("document", DocumentBlock()), ("quote", QuoteBlock()), ("card", CardBlock())]). Все блоки описаны один раз, рендерятся в цикле через {% include_block %}.
+
+Код (уже в home/models.py)
+
+class DocumentBlock(blocks.StructBlock):
+    document = DocumentChooserBlock(required=True)
+    title = blocks.CharBlock(required=False)
+    description = blocks.TextBlock(required=False)
+
+class QuoteBlock(blocks.StructBlock):
+    text = blocks.TextBlock(required=True)
+    author = blocks.CharBlock(required=False)
+
+class CardBlock(blocks.StructBlock):
+    heading = blocks.CharBlock(required=True)
+    image = ImageChooserBlock(required=False)
+
+class MultiBlockPage(Page):
+    body = StreamField([...], use_json_field=True, blank=True, default=list)
+Шаблон (уже в проекте)
+
+{% for block in page.body %}
+  <div class="col">{% include_block block %}</div>
+{% endfor %}
+Плюсы
+Один StreamField, одна панель в админке.
+Блоки можно перетаскивать, вставлять между собой в любом порядке.
+HTML каждого блока — в одном файле blocks/*.html, ноль дублей.
+Легко добавить новый тип блока (только один StructBlock + один шаблон).
+Логика конвертации ODT вынесена в home/utils.py — не дублируется.
+Минусы
+Нужно понимать StructBlock и include_block.
+Если нужно «ровно два документа и ровно две цитаты», требуется кастомная валидация (или ListBlock, см. Вариант Г).
+Вердикт
+✅ Рекомендуемый. Оптимальное соотношение гибкости и простоты для вашего случая.
+
+Вариант Г. ListBlock с фиксированной парой (группировка «по два»)
+Идея
+Если бизнес-требование жёсткое: именно два документа, две цитаты, две карточки — обернуть их в ListBlock с min_num=2, max_num=2.
+
+Код
+
+from wagtail import blocks
+
+class DocumentPairBlock(blocks.ListBlock):
+    def __init__(self, **kwargs):
+        super().__init__(DocumentBlock(), min_num=2, max_num=2, label="Два документа", **kwargs)
+
+class QuotePairBlock(blocks.ListBlock):
+    def __init__(self, **kwargs):
+        super().__init__(QuoteBlock(), min_num=2, max_num=2, label="Две цитаты", **kwargs)
+
+class MultiBlockPage(Page):
+    body = StreamField([
+        ("documents", DocumentPairBlock()),
+        ("quotes", QuotePairBlock()),
+        ("cards", CardBlock()),  # можно оставить отдельным StreamBlock
+    ], use_json_field=True, blank=True)
+Шаблон
+
+{% for block in page.body %}
+  {% if block.block_type == "documents" %}
+    {% for doc in block.value %}
+      {% include "home/includes/blocks/document.html" with item=doc %}
+    {% endfor %}
+  {% elif block.block_type == "quotes" %}
+    ...
+  {% endif %}
+{% endfor %}
+Плюсы
+Жёсткое соблюдение «ровно два» на уровне модели и админки (валидация автоматически).
+Редактор не сможет добавить третью цитату по ошибке.
+Минусы
+Меньше гибкости: нельзя перемешать документ и цитату между собой (они заперты в своих парах).
+Больше классов блоков в коде.
+Шаблон становится сложнее (вложенные циклы).
+Вердикт
+⚠️ Использовать только если требование «ровно два» жёсткое и порядок блоков не важен. Иначе усложняет проект без пользы.
+
+Вариант Д. Snippets + InlinePanel (связанные объекты)
+Идея
+Вынести документы, цитаты, карточки в отдельные сниппеты (SnippetViewSet) и привязать к странице через InlinePanel / ParentalManyToMany.
+
+Код (пример)
+
+from wagtail.snippets.models import register_snippet
+from wagtail.admin.panels import FieldPanel, InlinePanel
+from modelcluster.fields import ParentalKey
+from modelcluster.models import ClusterableModel
+
+@register_snippet
+class QuoteSnippet(ClusterableModel):
+    text = models.TextField()
+    author = models.CharField(max_length=200)
+    panels = [FieldPanel("text"), FieldPanel("author")]
+
+class QuotePage(Page):
+    parent_page_types = ["home.HomePage"]
+    content_panels = Page.content_panels + [
+        InlinePanel("quotes", label="Цитаты"),
+    ]
+
+class QuoteRelation(Orderable, models.Model):
+    page = ParentalKey(QuotePage, on_delete=models.CASCADE, related_name="quotes")
+    quote = models.ForeignKey(QuoteSnippet, on_delete=models.CASCADE)
+    panels = [FieldPanel("quote")]
+Плюсы
+Один и тот же сниппет можно переиспользовать на разных страницах.
+Удобно, если блоки редактируются отдельно от страницы.
+Минусы
+Значительно сложнее: нужно создавать сниппеты, модели связи, админ-интерфейсы.
+В шаблоне приходится делать запросы к БД (page.quotes.all()), а не рендерить StreamField.
+Для простого «50% повторов на одной странице» — оверкилл.
+Вердикт
+❌ Не для этого случая. Подходит, если блоки нужны на многих страницах и редактируются централизованно.
+
+Вариант Е. Дочерние страницы (Child Pages)
+Идея
+Каждый блок — это отдельная страница-потомок (DocumentPage, QuotePage, CardPage), а родительская страница выводит их списком.
+
+Код
+
+class DocumentPage(Page):
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
+    parent_page_types = ["home.MultiBlockPage"]
+
+class MultiBlockPage(Page):
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        context["documents"] = DocumentPage.objects.child_of(self).live()
+        context["quotes"] = QuotePage.objects.child_of(self).live()
+        return context
+Плюсы
+Каждый блок имеет свой URL, можно открывать отдельно.
+Полноценные страницы Wagtail с историей версий.
+Минусы
+Тяжёлое: создание многих страниц вместо одного StreamField.
+Дерево страниц разрастается.
+Нужен дополнительный код для сбора и сортировки детей.
+Вердикт
+❌ Не для этого случая. Подходит, если блоки должны быть独立 страницами, а не фрагментами одной страницы.
+
+Вариант Ё. Шаблонный цикл + {% include %} без StreamField (чистые Django-шаблоны)
+Идея
+Поля страницы остаются простыми (TextField, ForeignKey), а повторяющаяся часть выносится в частичные шаблоны и рендерится циклом из get_context.
+
+Код
+
+class SimplePage(Page):
+    docs_json = models.JSONField(default=list)  # [{title, file_id}, ...]
+    quotes_json = models.JSONField(default=list)
+
+    def get_context(self, request, *args, **kwargs):
+        context = super().get_context(request, *args, **kwargs)
+        context["documents"] = self.docs_json
+        context["quotes"] = self.quotes_json
+        return context
+Шаблон
+
+{% for doc in documents %}
+  {% include "home/includes/blocks/document.html" with item=doc %}
+{% endfor %}
+{% for quote in quotes %}
+  {% include "home/includes/blocks/quote.html" with item=quote %}
+{% endfor %}
+Плюсы
+Полный контроль над данными, нет магии StreamField.
+Работает с любыми Django-полями.
+Минусы
+Нет админ-редактора Wagtail для этих блоков — придётся писать кастомные формы/панели вручную.
+Редактор не получит удобный интерфейс с перетаскиванием.
+JSONField в админке — это просто текстовое поле, не удобно для нетехнических пользователей.
+Вердикт
+⚠️ Только если StreamField по какой-то причине не подходит (например, интеграция с внешним API).
+
+Вариант Ж. JS-клонирование на фронтенде
+Идея
+В админке или на фронтенде один блок рендерится сервером, остальные клонируются JavaScript-ом.
+
+Плюсы
+Нет дублирования HTML в шаблоне.
+Минусы
+Данные не сохраняются в базе автоматически.
+Нужно писать кастомный JS для админки Wagtail или отдельный API.
+Плохо для SEO и доступности.
+Вердикт
+❌ Не применимо для контентных блоков в Wagtail. Подходит только для UI-виджета (например, динамическая форма заказа).
+
+2. Сравнительная таблица
+Вариант	Дублирование HTML	Дублирование полей модели	Гибкость порядка блоков	Ограничение «ровно 2»	Сложность админки	Сложность кода	Подходит для вашего случая?
+А. Поля модели	❌ Высокое	❌ Высокое	❌ Нет	✅ Можно	Высокая (много панелей)	Низкая	❌ Нет
+Б. Несколько StreamField	⚠️ Среднее	⚠️ Среднее	❌ Нет (типы separados)	⚠️ Частично	Средняя	Средняя	⚠️ Только если секции строго разделены
+В. Один StreamField + StructBlock	✅ Минимальное	✅ Минимальное	✅ Да (перетаскивание)	⚠️ Только с кастомной валидацией	Низкая (1 панель)	Низкая	✅ Да
+Г. ListBlock с парой	✅ Минимальное	✅ Минимальное	⚠️ Внутри пары	✅ Да (автоматически)	Средняя	Средняя	⚠️ Если жёстко «ровно 2»
+Д. Snippets + InlinePanel	✅ Минимальное	✅ Минимальное	✅ Да	⚠️ Сложно	Высокая	Высокая	❌ Оверкилл
+Е. Дочерние страницы	✅ Минимальное	✅ Минимальное	✅ Да	⚠️ Сложно	Средняя	Средняя	❌ Оверкилл
+Ё. JSONField + цикл	✅ Минимальное	⚠️ Среднее	✅ Да	✅ Можно	Низкая (но нет админки)	Средняя	❌ Нет удобного админ-интерфейса
+Ж. JS-клонирование	✅ Минимальное	❌ Нет (не в БД)	✅ Да	❌ Нет	Высокая (кастом JS)	Высокая	❌ Нет
+3. Финальная рекомендация
+Основной путь (уже реализован)
+Вариант В — один StreamField с StructBlock и {% include_block %}. Это даёт:
+
+ноль дублей HTML,
+одну панель в админке,
+произвольный порядок и количество блоков,
+переиспользование уже написанного в проекте (DocumentChooserBlock, ImageChooserBlock, home/utils.py).
+Если требование «ровно два» жёсткое
+Добавьте валидацию в модель MultiBlockPage без отказа от StreamField:
+
+
+from django.core.exceptions import ValidationError
+
+class MultiBlockPage(Page):
+    body = StreamField([...])
+
+    def clean(self):
+        super().clean()
+        types = [b.block_type for b in self.body]
+        if types.count("document") != 2:
+            raise ValidationError({"body": "Должно быть ровно 2 документа"})
+        if types.count("quote") != 2:
+            raise ValidationError({"body": "Должно быть ровно 2 цитаты"})
+Это проще, чем ListBlock, и не ломает гибкость StreamField.
+
+Если нужны секции (сначала документы, потом цитаты, потом карточки)
+Используйте Вариант Б (три StreamField) или разбейте MultiBlockPage на отдельные секции через StreamBlock сグループiroвкой.
+
+4. Что уже сделано в вашем проекте
+Файл	Содержимое
+home/models.py	DocumentBlock, QuoteBlock, CardBlock, MultiBlockPage
+home/utils.py	convert_odt_to_html — единая точка конвертации ODT
+home/templates/home/multi_block_page.html	Страница с циклом {% include_block block %}
+home/templates/home/includes/blocks/document.html	Шаблон документа
+home/templates/home/includes/blocks/quote.html	Шаблон цитаты
+home/templates/home/includes/blocks/card.html	Шаблон карточки
+home/tests.py	MultiBlockPageTests (4 теста)
+home/migrations/0012_multiblockpage.py	Миграция, применена
+Все 40 тестов приложения home проходят, manage.py check чистый, сервер запускается.
+
+Если хотите, могу добавить в модель MultiBlockPage валидацию «ровно по два блока каждого типа» или вынести блоки в отдельный файл home/blocks.py для ещё большего разделения ответственности.

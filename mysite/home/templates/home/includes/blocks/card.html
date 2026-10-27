@@ -1,0 +1,14 @@
+{% load wagtailimages_tags %}
+<div class="card h-100 shadow-sm">
+  {% if item.image %}
+    {% image item.image fill-300x200 as img %}
+    <img src="{{ img.url }}" alt="{{ item.heading }}" class="card-img-top">
+  {% endif %}
+  <div class="card-body">
+    <h5 class="card-title">{{ item.heading }}</h5>
+    {% if item.text %}<p class="card-text">{{ item.text }}</p>{% endif %}
+    {% if item.link_url %}
+      <a href="{{ item.link_url }}" class="btn btn-primary stretched-link">Подробнее</a>
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,10 @@
+{% load wagtailcore_tags %}
+<div class="card h-100 border-start border-primary border-3 shadow-sm">
+  <div class="card-body">
+    {% if item.title %}<h5 class="card-title">{{ item.title }}</h5>{% endif %}
+    {% if item.description %}<p class="card-text small">{{ item.description }}</p>{% endif %}
+    <a href="{% pageurl item.document %}" class="btn btn-outline-primary btn-sm" download>
+      ⬇ Скачать документ
+    </a>
+  </div>
+</div>

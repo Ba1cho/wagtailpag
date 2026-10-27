@@ -11,6 +11,8 @@ from wagtail.admin.panels import FieldPanel, InlinePanel
 from wagtail.admin.viewsets.chooser import ChooserViewSet
 from wagtail.fields import StreamField
 from wagtail.models import Orderable, Page
+from wagtail.documents.blocks import DocumentChooserBlock
+from wagtail.images.blocks import ImageChooserBlock
 
 
 # ---------------------------------------------------------------------------
@@ -533,5 +535,78 @@ class SchedulePage(Page):
 
 class HomePage(Page):
     pass
+
+
+# ---------------------------------------------------------------------------
+# Блоки повторяющегося контента (документ / цитата / карточка)
+# ---------------------------------------------------------------------------
+
+
+class DocumentBlock(blocks.StructBlock):
+    """Один блок документа: файл + необязательный заголовок/описание."""
+
+    document = DocumentChooserBlock(required=True, label="Документ")
+    title = blocks.CharBlock(required=False, label="Заголовок")
+    description = blocks.TextBlock(required=False, label="Описание")
+
+    class Meta:
+        icon = "doc-full"
+        label = "Документ"
+
+
+class QuoteBlock(blocks.StructBlock):
+    """Одна цитата."""
+
+    text = blocks.TextBlock(required=True, label="Текст цитаты")
+    author = blocks.CharBlock(required=False, label="Автор")
+    source = blocks.CharBlock(required=False, label="Источник")
+
+    class Meta:
+        icon = "openquote"
+        label = "Цитата"
+
+
+class CardBlock(blocks.StructBlock):
+    """Одна карточка."""
+
+    heading = blocks.CharBlock(required=True, label="Заголовок")
+    text = blocks.TextBlock(required=False, label="Текст")
+    image = ImageChooserBlock(required=False, label="Картинка")
+    link_url = blocks.URLBlock(required=False, label="Ссылка")
+
+    class Meta:
+        icon = "site"
+        label = "Карточка"
+
+
+class MultiBlockPage(Page):
+    """
+    Страница с повторяющимися блоками.
+    Редактор добавляет документы, цитаты и карточки в любом порядке и количестве
+    через один StreamField — дублирования полей и HTML нет.
+    """
+
+    body = StreamField(
+        [
+            ("document", DocumentBlock()),
+            ("quote", QuoteBlock()),
+            ("card", CardBlock()),
+        ],
+        use_json_field=True,
+        blank=True,
+        default=list,
+        verbose_name="Содержимое страницы",
+    )
+
+    content_panels = Page.content_panels + [
+        FieldPanel("body"),
+    ]
+
+    parent_page_types = ["home.HomePage"]
+    subpage_types = []
+
+    class Meta:
+        verbose_name = "Страница с блоками"
+        verbose_name_plural = "Страницы с блоками"
 
 

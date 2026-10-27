@@ -1,0 +1,12 @@
+<div class="card h-100 border-start border-warning border-3 bg-light shadow-sm">
+  <div class="card-body">
+    <blockquote class="blockquote mb-0">
+      <p>{{ item.text }}</p>
+      {% if item.author or item.source %}
+        <footer class="blockquote-footer mt-2">
+          {{ item.author }}{% if item.source %} — {{ item.source }}{% endif %}
+        </footer>
+      {% endif %}
+    </blockquote>
+  </div>
+</div>
