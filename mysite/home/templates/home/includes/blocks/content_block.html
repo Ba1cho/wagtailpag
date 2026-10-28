@@ -1,0 +1,13 @@
+{% load wagtailimages_tags %}
+<div class="card h-100 shadow-sm content-block">
+  {% if self.image %}
+    {% image self.image fill-800x600 as img %}
+    <img src="{{ img.url }}" alt="{{ self.heading }}" class="card-img-top">
+  {% endif %}
+  <div class="card-body">
+    <h5 class="card-title">{{ self.heading }}</h5>
+    {% if self.description %}
+      <div class="card-text">{{ self.description }}</div>
+    {% endif %}
+  </div>
+</div>

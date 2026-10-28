@@ -579,11 +579,98 @@ class CardBlock(blocks.StructBlock):
         label = "Карточка"
 
 
+class ContentBlock(blocks.StructBlock):
+    """Переиспользуемый модуль: изображение + заголовок + описание (rich text).
+
+    Один шаблон (home/includes/blocks/content_block.html) используется на всех
+    страницах — в него попадает разное изображение, заголовок и текст.
+    """
+
+    image = ImageChooserBlock(required=False, label="Изображение")
+    heading = blocks.CharBlock(required=True, label="Заголовок")
+    description = blocks.RichTextBlock(required=False, label="Описание")
+
+    class Meta:
+        icon = "image"
+        template = "home/includes/blocks/content_block.html"
+        label = "Заголовок + картинка + текст"
+
+
+class AccordionItemBlock(blocks.StructBlock):
+    """Одна вкладка аккордеона: заголовок + своё содержимое (другие блоки)."""
+
+    title = blocks.CharBlock(required=True, label="Заголовок вкладки")
+    content = blocks.StreamBlock(
+        [
+            ("content", ContentBlock()),
+            ("document", DocumentBlock()),
+            ("quote", QuoteBlock()),
+            ("card", CardBlock()),
+        ],
+        label="Содержимое вкладки",
+    )
+
+    class Meta:
+        icon = "plus"
+        label = "Элемент аккордеона"
+
+    def check(self, **kwargs):
+        # Аккордеон может содержать вложенный аккордеон (через content → accordion),
+        # поэтому обычная рекурсивная проверка Wagtail уходит в бесконечную
+        # рекурсию. Выполняем только базовую проверку блока без обхода потомков.
+        from wagtail.blocks.base import Block
+        return Block.check(self, **kwargs)
+
+    def deconstruct_with_lookup(self, lookup):
+        # Рекурсивный блок: не обходим дочерние блоки (иначе
+        # makemigrations уходит в бесконечную рекурсию). child_blocks пуст —
+        # Wagtail восстановит реальное определение блока из кода при загрузке.
+        return ("home.models.AccordionItemBlock", [], {"child_blocks": []})
+
+
+class AccordionBlock(blocks.StructBlock):
+    """Аккордеон: список вкладок. Внутри каждой вкладки — свои блоки контента,
+    в том числе вложенный аккордеон (добавляется ниже в content, чтобы избежать
+    циклической ссылки при импорте модуля)."""
+
+    items = blocks.StreamBlock(
+        [("accordion_item", AccordionItemBlock())],
+        label="Вкладки аккордеона",
+    )
+
+    class Meta:
+        icon = "arrow-down"
+        template = "home/includes/blocks/accordion.html"
+        label = "Аккордеон"
+
+    def check(self, **kwargs):
+        # Аналогично AccordionItemBlock: избегаем рекурсивной проверки
+        # вложенных аккордеонов.
+        from wagtail.blocks.base import Block
+        return Block.check(self, **kwargs)
+
+    def deconstruct_with_lookup(self, lookup):
+        return ("home.models.AccordionBlock", [], {"child_blocks": []})
+
+
+# Рекурсивная вложенность: внутри содержимого вкладки аккордеона может быть
+# ещё один аккордеон (и любой другой блок со страницы). Добавляем после того,
+# как оба класса определены, через declared_blocks (прямой атрибут content на
+# классе StructBlock не создаётся). set_name обязателен, иначе Wagtail
+# ругается на пустое имя блока (wagtailcore.E001).
+accordion_block = AccordionBlock()
+accordion_block.set_name("accordion")
+content_block = AccordionItemBlock.declared_blocks["content"]
+content_block.base_blocks["accordion"] = accordion_block
+content_block.child_blocks["accordion"] = accordion_block
+
+
 class MultiBlockPage(Page):
     """
     Страница с повторяющимися блоками.
-    Редактор добавляет документы, цитаты и карточки в любом порядке и количестве
-    через один StreamField — дублирования полей и HTML нет.
+    Редактор добавляет документы, цитаты, карточки, модули «заголовок +
+    картинка + текст» и аккордеоны в любом порядке и количестве через один
+    StreamField — дублирования полей и HTML нет.
     """
 
     body = StreamField(
@@ -591,6 +678,8 @@ class MultiBlockPage(Page):
             ("document", DocumentBlock()),
             ("quote", QuoteBlock()),
             ("card", CardBlock()),
+            ("content", ContentBlock()),
+            ("accordion", AccordionBlock()),
         ],
         use_json_field=True,
         blank=True,

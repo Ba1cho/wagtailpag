@@ -656,3 +656,79 @@ class MultiBlockPageTests(WagtailPageTestCase):
         html = response.content.decode("utf-8")
         self.assertIn("Контент пока не добавлен", html)
 
+    def test_content_and_accordion_blocks_render(self):
+        """Модуль «картинка + заголовок + текст» и аккордеон рендерятся через
+        общий цикл {% include_block %}; аккордеон содержит вложенные блоки,
+        в том числе вложенный аккордеон."""
+        self.page.body = [
+            {
+                "type": "content",
+                "value": {
+                    "image": None,
+                    "heading": "Заголовок модуля",
+                    "description": "<p>Описание модуля <strong>жирным</strong></p>",
+                },
+            },
+            {
+                "type": "accordion",
+                "value": {
+                    "items": [
+                        {
+                            "type": "accordion_item",
+                            "value": {
+                                "title": "Вкладка первая",
+                                "content": [
+                                    {
+                                        "type": "content",
+                                        "value": {
+                                            "image": None,
+                                            "heading": "Вкладка: заголовок",
+                                            "description": "<p>Вложенный контент</p>",
+                                        },
+                                    },
+                                    {
+                                        "type": "accordion",
+                                        "value": {
+                                            "items": [
+                                                {
+                                                    "type": "accordion_item",
+                                                    "value": {
+                                                        "title": "Аккордеон внутри аккордеона",
+                                                        "content": [
+                                                            {
+                                                                "type": "content",
+                                                                "value": {
+                                                                    "image": None,
+                                                                    "heading": "Внутренний аккордеон: контент",
+                                                                    "description": "<p>Глубина вложенности 2</p>",
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            },
+        ]
+        self.page.save()
+        response = self.client.get(self.page.url)
+        html = response.content.decode("utf-8")
+
+        self.assertIn("Заголовок модуля", html)
+        self.assertIn("Описание модуля", html)
+        self.assertIn("жирным", html)
+        self.assertIn("Вкладка первая", html)
+        self.assertIn("Вкладка: заголовок", html)
+        self.assertIn("Вложенный контент", html)
+        self.assertIn('class="accordion"', html)
+        self.assertIn('class="accordion-item"', html)
+        self.assertIn("Аккордеон внутри аккордеона", html)
+        self.assertIn("Внутренний аккордеон: контент", html)
+        self.assertIn("Глубина вложенности 2", html)
+
