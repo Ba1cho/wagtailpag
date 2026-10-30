@@ -12,6 +12,7 @@ from home.models import (
     GroupModel,
     GroupPage,
     HomePage,
+    LandingPage,
     MultiBlockPage,
     QuoteBlock,
     SchedulePage,
@@ -731,4 +732,83 @@ class MultiBlockPageTests(WagtailPageTestCase):
         self.assertIn("Аккордеон внутри аккордеона", html)
         self.assertIn("Внутренний аккордеон: контент", html)
         self.assertIn("Глубина вложенности 2", html)
+
+
+class LandingPageTests(WagtailPageTestCase):
+    """Проверяем страницу с несколькими секциями (разные места на одной странице)."""
+
+    def setUp(self):
+        root_page = Page.get_first_root_node()
+        Site.objects.create(
+            hostname="testsite", root_page=root_page, is_default_site=True
+        )
+        self.homepage = HomePage(title="Home")
+        root_page.add_child(instance=self.homepage)
+        self.page = LandingPage(title="Тестовый лендинг")
+        self.homepage.add_child(instance=self.page)
+
+    def test_sections_rendered_in_different_places(self):
+        """Каждая секция LandingPage рендерится в своём месте на странице."""
+        self.page.top_section = [
+            {
+                "type": "content",
+                "value": {
+                    "image": None,
+                    "heading": "Верхний модуль",
+                    "description": "<p>Контент верхней секции</p>",
+                },
+            },
+        ]
+        self.page.middle_section = [
+            {
+                "type": "accordion",
+                "value": {
+                    "items": [
+                        {
+                            "type": "accordion_item",
+                            "value": {
+                                "title": "Средняя вкладка",
+                                "content": [
+                                    {
+                                        "type": "content",
+                                        "value": {
+                                            "image": None,
+                                            "heading": "Средний модуль",
+                                            "description": "<p>Контент средней секции</p>",
+                                        },
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            },
+        ]
+        self.page.bottom_section = [
+            {
+                "type": "card",
+                "value": {
+                    "heading": "Нижняя карточка",
+                    "text": "Контент нижней секции",
+                    "image": None,
+                    "link_url": "",
+                },
+            },
+        ]
+        self.page.save()
+        response = self.client.get(self.page.url)
+        html = response.content.decode("utf-8")
+
+        self.assertTemplateUsed(response, "home/landing_page.html")
+        self.assertIn("Верхний модуль", html)
+        self.assertIn("Контент верхней секции", html)
+        self.assertIn("Средняя вкладка", html)
+        self.assertIn("Средний модуль", html)
+        self.assertIn("Контент средней секции", html)
+        self.assertIn("Нижняя карточка", html)
+        self.assertIn("Контент нижней секции", html)
+        # Каждая секция в своём HTML-блоке
+        self.assertIn("Верхняя секция", html)
+        self.assertIn("Средняя секция", html)
+        self.assertIn("Нижняя секция", html)
 

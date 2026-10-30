@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load wagtailcore_tags %}
+
+{% block body_class %}template-landingpage{% endblock %}
+
+{% block content %}
+  <div class="container py-4">
+    <h1>{{ page.title }}</h1>
+
+    {% if page.top_section %}
+      <section class="py-5 bg-light border-bottom">
+        <div class="container">
+          <h2 class="h4 mb-4">Верхняя секция</h2>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for block in page.top_section %}
+              <div class="col">
+                {% include_block block %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if page.middle_section %}
+      <section class="py-5 border-bottom">
+        <div class="container">
+          <h2 class="h4 mb-4">Средняя секция</h2>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for block in page.middle_section %}
+              <div class="col">
+                {% include_block block %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if page.bottom_section %}
+      <section class="py-5 bg-light">
+        <div class="container">
+          <h2 class="h4 mb-4">Нижняя секция</h2>
+          <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for block in page.bottom_section %}
+              <div class="col">
+                {% include_block block %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if not page.top_section and not page.middle_section and not page.bottom_section %}
+      <div class="alert alert-info">Контент пока не добавлен.</div>
+    {% endif %}
+  </div>
+{% endblock %}
